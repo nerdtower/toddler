@@ -11,9 +11,8 @@ stty -echo -icanon time 1 min 0
 clear
 
 # Disable most interrupt signals - make it child-proof!
-# But allow Ctrl-\ (SIGQUIT) for adult exit
-trap '' INT TERM SIGTSTP SIGTTIN SIGTTOU
-trap cleanup SIGQUIT
+# We'll handle exit via custom key sequence in the main loop
+trap '' INT TERM SIGTSTP SIGTTIN SIGTTOU SIGQUIT
 
 cleanup() {
     # Restore terminal settings
@@ -445,6 +444,24 @@ while true; do
     read -n1 key
 
     if [ "$key" != "" ]; then
+        # Check for exit sequence: requires a very specific, non-sequential combination
+        # This is virtually impossible for a toddler to trigger accidentally
+        if [ "$key" = "z" ] || [ "$key" = "Z" ]; then
+            # First step: check for '9' within 1 second (number, not letter)
+            echo -n "Press '9' within 1 second to continue exit sequence: "
+            read -t 1 -n1 step1
+            if [ "$step1" = "9" ]; then
+                # Second step: check for '!' within 1 second (symbol, requires shift)
+                echo -n "Press '!' (shift+1) within 1 second to exit: "
+                read -t 1 -n1 step2
+                if [ "$step2" = "!" ]; then
+                    cleanup
+                    exit 0
+                fi
+            fi
+            echo  # New line after the prompt
+        fi
+        
         # Random color
         color=${colors[$RANDOM % ${#colors[@]}]}
 
