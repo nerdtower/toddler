@@ -1,7 +1,14 @@
 #!/bin/bash
-
+#
+# toddler.sh - Child-friendly interactive terminal application for learning letters and numbers
+# Copyright (c) 2024 Nerd Tower LLC
+# Licensed under the MIT License - see LICENSE file for details
+#
 # Setup
 stty -echo -icanon time 1 min 0
+
+# Clear screen on startup
+clear
 
 # Disable most interrupt signals - make it child-proof!
 # But allow Ctrl-\ (SIGQUIT) for adult exit
@@ -22,264 +29,377 @@ cleanup() {
     exit 0
 }
 
-# ASCII art function for letters
+# Function to get letter ASCII art
+get_letter_art() {
+    local letter="$1"
+    case "$letter" in
+        A) echo "    A    
+   A A   
+  AAAAA  
+ A     A 
+A       A" ;;
+        B) echo "BBBBB  
+B     B
+BBBBB  
+B     B
+BBBBB  " ;;
+        C) echo " CCCCC 
+C     C
+C      
+C      
+C     C
+ CCCCC " ;;
+        D) echo "DDDDD  
+D     D
+D     D
+D     D
+DDDDD  " ;;
+        E) echo "EEEEE
+E    
+EEEE 
+E    
+EEEEE" ;;
+        F) echo "FFFFF
+F    
+FFFF 
+F    
+F    " ;;
+        G) echo " GGGGG 
+G     G
+G      
+G   GGG
+G     G
+ GGGGG " ;;
+        H) echo "H     H
+H     H
+HHHHHHH
+H     H
+H     H" ;;
+        I) echo "IIIII
+  I  
+  I  
+  I  
+IIIII" ;;
+        J) echo "     J
+     J
+     J
+J    J
+ JJJJ " ;;
+        K) echo "K   K
+K  K 
+KKK  
+K  K 
+K   K" ;;
+        L) echo "L    
+L    
+L    
+L    
+LLLLL" ;;
+        M) echo "M     M
+MM   MM
+M M M M
+M  M  M
+M     M" ;;
+        N) echo "N     N
+NN    N
+N N   N
+N  N  N
+N     N" ;;
+        O) echo " OOOOO 
+O     O
+O     O
+O     O
+ OOOOO " ;;
+        P) echo "PPPPPP 
+P     P
+PPPPPP 
+P      
+P      " ;;
+        Q) echo " QQQQQ 
+Q     Q
+Q     Q
+Q   Q Q
+ QQQQQ 
+      Q" ;;
+        R) echo "RRRRRR 
+R     R
+RRRRRR 
+R   R  
+R     R" ;;
+        S) echo " SSSSS 
+S     S
+ SSSSS 
+      S
+S     S
+ SSSSS " ;;
+        T) echo "TTTTTTT
+   T   
+   T   
+   T   
+   T   " ;;
+        U) echo "U     U
+U     U
+U     U
+U     U
+ UUUUU " ;;
+        V) echo "V     V
+V     V
+V     V
+ V   V 
+  V V  
+   V   " ;;
+        W) echo "W     W
+W     W
+W  W  W
+W W W W
+WW   WW" ;;
+        X) echo "X     X
+ X   X 
+  X X  
+ X   X 
+X     X" ;;
+        Y) echo "Y     Y
+ Y   Y 
+  Y Y  
+   Y   
+   Y   " ;;
+        Z) echo "ZZZZZZZ
+     Z 
+   Z   
+ Z     
+ZZZZZZZ " ;;
+        *) echo "" ;;
+    esac
+}
+
+# Function to get number ASCII art
+get_number_art() {
+    local number="$1"
+    case "$number" in
+        0) echo " 0000 
+0    0
+0    0
+0    0
+ 0000 " ;;
+        1) echo "  11  
+ 111  
+  11  
+  11  
+ 1111 " ;;
+        2) echo " 2222 
+2    2
+    2 
+   2  
+  2   
+222222" ;;
+        3) echo " 3333 
+3    3
+    3 
+ 3333 
+3    3
+ 3333 " ;;
+        4) echo "4   4 
+4   4 
+4   4 
+444444
+    4 
+    4 " ;;
+        5) echo "555555
+5     
+55555 
+     5
+5    5
+ 5555 " ;;
+        6) echo " 6666 
+6     
+6     
+66666 
+6    6
+ 6666 " ;;
+        7) echo "777777
+     7
+    7 
+   7  
+  7   
+ 7    " ;;
+        8) echo " 8888 
+8    8
+ 8888 
+8    8
+ 8888 " ;;
+        9) echo " 9999 
+9    9
+ 99999
+     9
+9    9
+ 9999 " ;;
+        *) echo "" ;;
+    esac
+}
+
+# Function to get maximum line length from an array of lines
+get_max_length() {
+    local max_len=0
+    while IFS= read -r line; do
+        local len=${#line}
+        if [ $len -gt $max_len ]; then
+            max_len=$len
+        fi
+    done <<< "$1"
+    echo $max_len
+}
+
+# Function to pad a line to a specific width
+pad_line() {
+    local line="$1"
+    local width="$2"
+    printf "%-*s" "$width" "$line"
+}
+
+# ASCII art function for letters and numbers
 print_big_letter() {
     local letter="$1"
     local color="$2"
+    local repeat_count="${3:-1}"
     
     case "$letter" in
         [A-Za-z])
-            # Simple ASCII art for letters
-            case "$letter" in
-                [Aa])
-                    echo -e "\033[${color}m"
-                    echo "    A    "
-                    echo "   A A   "
-                    echo "  AAAAA  "
-                    echo " A     A "
-                    echo "A       A"
-                    echo -e "\033[0m"
-                    ;;
-                [Bb])
-                    echo -e "\033[${color}m"
-                    echo "BBBBB  "
-                    echo "B     B"
-                    echo "BBBBB  "
-                    echo "B     B"
-                    echo "BBBBB  "
-                    echo -e "\033[0m"
-                    ;;
-                [Cc])
-                    echo -e "\033[${color}m"
-                    echo " CCCCC "
-                    echo "C     C"
-                    echo "C      "
-                    echo "C      "
-                    echo "C     C"
-                    echo " CCCCC "
-                    echo -e "\033[0m"
-                    ;;
-                [Dd])
-                    echo -e "\033[${color}m"
-                    echo "DDDDD  "
-                    echo "D     D"
-                    echo "D     D"
-                    echo "D     D"
-                    echo "DDDDD  "
-                    echo -e "\033[0m"
-                    ;;
-                [Ee])
-                    echo -e "\033[${color}m"
-                    echo "EEEEE"
-                    echo "E    "
-                    echo "EEEE "
-                    echo "E    "
-                    echo "EEEEE"
-                    echo -e "\033[0m"
-                    ;;
-                [Ff])
-                    echo -e "\033[${color}m"
-                    echo "FFFFF"
-                    echo "F    "
-                    echo "FFFF "
-                    echo "F    "
-                    echo "F    "
-                    echo -e "\033[0m"
-                    ;;
-                [Gg])
-                    echo -e "\033[${color}m"
-                    echo " GGGGG "
-                    echo "G     G"
-                    echo "G      "
-                    echo "G   GGG"
-                    echo "G     G"
-                    echo " GGGGG "
-                    echo -e "\033[0m"
-                    ;;
-                [Hh])
-                    echo -e "\033[${color}m"
-                    echo "H     H"
-                    echo "H     H"
-                    echo "HHHHHHH"
-                    echo "H     H"
-                    echo "H     H"
-                    echo -e "\033[0m"
-                    ;;
-                [Ii])
-                    echo -e "\033[${color}m"
-                    echo "IIIII"
-                    echo "  I  "
-                    echo "  I  "
-                    echo "  I  "
-                    echo "IIIII"
-                    echo -e "\033[0m"
-                    ;;
-                [Jj])
-                    echo -e "\033[${color}m"
-                    echo "     J"
-                    echo "     J"
-                    echo "     J"
-                    echo "J    J"
-                    echo " JJJJ "
-                    echo -e "\033[0m"
-                    ;;
-                [Kk])
-                    echo -e "\033[${color}m"
-                    echo "K   K"
-                    echo "K  K "
-                    echo "KKK  "
-                    echo "K  K "
-                    echo "K   K"
-                    echo -e "\033[0m"
-                    ;;
-                [Ll])
-                    echo -e "\033[${color}m"
-                    echo "L    "
-                    echo "L    "
-                    echo "L    "
-                    echo "L    "
-                    echo "LLLLL"
-                    echo -e "\033[0m"
-                    ;;
-                [Mm])
-                    echo -e "\033[${color}m"
-                    echo "M     M"
-                    echo "MM   MM"
-                    echo "M M M M"
-                    echo "M  M  M"
-                    echo "M     M"
-                    echo -e "\033[0m"
-                    ;;
-                [Nn])
-                    echo -e "\033[${color}m"
-                    echo "N     N"
-                    echo "NN    N"
-                    echo "N N   N"
-                    echo "N  N  N"
-                    echo "N     N"
-                    echo -e "\033[0m"
-                    ;;
-                [Oo])
-                    echo -e "\033[${color}m"
-                    echo " OOOOO "
-                    echo "O     O"
-                    echo "O     O"
-                    echo "O     O"
-                    echo " OOOOO "
-                    echo -e "\033[0m"
-                    ;;
-                [Pp])
-                    echo -e "\033[${color}m"
-                    echo "PPPPPP "
-                    echo "P     P"
-                    echo "PPPPPP "
-                    echo "P      "
-                    echo "P      "
-                    echo -e "\033[0m"
-                    ;;
-                [Qq])
-                    echo -e "\033[${color}m"
-                    echo " QQQQQ "
-                    echo "Q     Q"
-                    echo "Q     Q"
-                    echo "Q   Q Q"
-                    echo " QQQQQ "
-                    echo "      Q"
-                    echo -e "\033[0m"
-                    ;;
-                [Rr])
-                    echo -e "\033[${color}m"
-                    echo "RRRRRR "
-                    echo "R     R"
-                    echo "RRRRRR "
-                    echo "R   R  "
-                    echo "R     R"
-                    echo -e "\033[0m"
-                    ;;
-                [Ss])
-                    echo -e "\033[${color}m"
-                    echo " SSSSS "
-                    echo "S     S"
-                    echo " SSSSS "
-                    echo "      S"
-                    echo "S     S"
-                    echo " SSSSS "
-                    echo -e "\033[0m"
-                    ;;
-                [Tt])
-                    echo -e "\033[${color}m"
-                    echo "TTTTTTT"
-                    echo "   T   "
-                    echo "   T   "
-                    echo "   T   "
-                    echo "   T   "
-                    echo -e "\033[0m"
-                    ;;
-                [Uu])
-                    echo -e "\033[${color}m"
-                    echo "U     U"
-                    echo "U     U"
-                    echo "U     U"
-                    echo "U     U"
-                    echo " UUUUU "
-                    echo -e "\033[0m"
-                    ;;
-                [Vv])
-                    echo -e "\033[${color}m"
-                    echo "V     V"
-                    echo "V     V"
-                    echo "V     V"
-                    echo " V   V "
-                    echo "  V V  "
-                    echo "   V   "
-                    echo -e "\033[0m"
-                    ;;
-                [Ww])
-                    echo -e "\033[${color}m"
-                    echo "W     W"
-                    echo "W     W"
-                    echo "W  W  W"
-                    echo "W W W W"
-                    echo "WW   WW"
-                    echo -e "\033[0m"
-                    ;;
-                [Xx])
-                    echo -e "\033[${color}m"
-                    echo "X     X"
-                    echo " X   X "
-                    echo "  X X  "
-                    echo " X   X "
-                    echo "X     X"
-                    echo -e "\033[0m"
-                    ;;
-                [Yy])
-                    echo -e "\033[${color}m"
-                    echo "Y     Y"
-                    echo " Y   Y "
-                    echo "  Y Y  "
-                    echo "   Y   "
-                    echo "   Y   "
-                    echo -e "\033[0m"
-                    ;;
-                [Zz])
-                    echo -e "\033[${color}m"
-                    echo "ZZZZZZZ"
-                    echo "     Z "
-                    echo "   Z   "
-                    echo " Z     "
-                    echo "ZZZZZZZ"
-                    echo -e "\033[0m"
-                    ;;
-            esac
+            # Convert to uppercase
+            local upper_letter=$(echo "$letter" | tr '[:lower:]' '[:upper:]')
+            
+            # Get the art for this letter
+            local art=$(get_letter_art "$upper_letter")
+            
+            if [ -n "$art" ]; then
+                echo -e "\033[${color}m"
+                
+                # Get the maximum line length for padding
+                local max_length=$(get_max_length "$art")
+                
+                # Print each line repeated
+                while IFS= read -r line; do
+                    for ((j=1; j<=repeat_count; j++)); do
+                        pad_line "$line" "$max_length"
+                        if [ $j -lt $repeat_count ]; then
+                            echo -n "  "
+                        fi
+                    done
+                    echo
+                done <<< "$art"
+                
+                echo -e "\033[0m"
+            else
+                # Fallback for unknown letters
+                echo -e "\033[${color}m"
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n "  $letter$letter$letter$letter$letter  "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n "$letter$letter$letter$letter$letter$letter$letter$letter$letter"
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n "  $letter$letter$letter$letter$letter  "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                echo -e "\033[0m"
+            fi
+            ;;
+        [0-9])
+            # Get the art for this number
+            local art=$(get_number_art "$letter")
+            
+            if [ -n "$art" ]; then
+                echo -e "\033[${color}m"
+                
+                # Get the maximum line length for padding
+                local max_length=$(get_max_length "$art")
+                
+                # Print each line repeated
+                while IFS= read -r line; do
+                    for ((j=1; j<=repeat_count; j++)); do
+                        pad_line "$line" "$max_length"
+                        if [ $j -lt $repeat_count ]; then
+                            echo -n "  "
+                        fi
+                    done
+                    echo
+                done <<< "$art"
+                
+                echo -e "\033[0m"
+            else
+                # Fallback for unknown numbers
+                echo -e "\033[${color}m"
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n "  $letter$letter$letter$letter$letter  "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n "$letter$letter$letter$letter$letter$letter$letter$letter$letter"
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                for ((i=1; i<=repeat_count; i++)); do
+                    echo -n "  $letter$letter$letter$letter$letter  "
+                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+                done
+                echo
+                echo -e "\033[0m"
+            fi
             ;;
         *)
-            # For non-letters, just show the character
+            # For non-letters, create a simple block pattern
             echo -e "\033[${color}m"
-            echo "  $letter  "
-            echo " $letter$letter$letter "
-            echo "$letter$letter$letter$letter$letter"
-            echo " $letter$letter$letter "
-            echo "  $letter  "
+            for ((i=1; i<=repeat_count; i++)); do
+                echo -n "  $letter$letter$letter$letter$letter  "
+                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+            done
+            echo
+            for ((i=1; i<=repeat_count; i++)); do
+                echo -n " $letter$letter$letter$letter$letter$letter$letter "
+                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+            done
+            echo
+            for ((i=1; i<=repeat_count; i++)); do
+                echo -n "$letter$letter$letter$letter$letter$letter$letter$letter$letter"
+                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+            done
+            echo
+            for ((i=1; i<=repeat_count; i++)); do
+                echo -n " $letter$letter$letter$letter$letter$letter$letter "
+                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+            done
+            echo
+            for ((i=1; i<=repeat_count; i++)); do
+                echo -n "  $letter$letter$letter$letter$letter  "
+                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
+            done
+            echo
             echo -e "\033[0m"
             ;;
     esac
@@ -288,6 +408,39 @@ print_big_letter() {
 # Color list
 colors=(31 32 33 34 35 36 37)
 
+# Parse command line arguments
+repeat_count=5
+test_mode=false
+test_letter=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--number)
+            repeat_count="$2"
+            shift 2
+            ;;
+        test)
+            test_mode=true
+            test_letter="${2:-A}"
+            shift 2
+            ;;
+        *)
+            echo "Usage: $0 [-n|--number COUNT] [test [CHARACTER]]"
+            echo "  -n, --number COUNT: Number of characters to display on each line (default: 5)"
+            echo "  test [CHARACTER]: Test mode - display one character and exit"
+            exit 1
+            ;;
+    esac
+done
+
+# Check if test mode is requested
+if [ "$test_mode" = true ]; then
+    # Test mode: output one letter and quit
+    color=${colors[$RANDOM % ${#colors[@]}]}
+    print_big_letter "$test_letter" "$color" "$repeat_count"
+    exit 0
+fi
+
 while true; do
     read -n1 key
 
@@ -295,7 +448,7 @@ while true; do
         # Random color
         color=${colors[$RANDOM % ${#colors[@]}]}
 
-        # Print big colored letter (no clear screen)
-        print_big_letter "$key" "$color"
+        # Print big colored letter with specified repeat count
+        print_big_letter "$key" "$color" "$repeat_count"
     fi
 done
