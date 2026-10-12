@@ -4,28 +4,16 @@
 # Copyright (c) 2024 Nerd Tower LLC
 # Licensed under the MIT License - see LICENSE file for details
 #
-# Setup
-stty -echo -icanon time 1 min 0
-
-# Clear screen on startup
-clear
-
-# Disable most interrupt signals - make it child-proof!
-# We'll handle exit via custom key sequence in the main loop
-trap '' INT TERM SIGTSTP SIGTTIN SIGTTOU SIGQUIT
-
 cleanup() {
-    # Restore terminal settings
-    stty sane
-    stty echo icanon
-    # Clear any pending input
-    while read -t0; do :; done 2>/dev/null || true
-    # Reset terminal colors
-    echo -e "\033[0m"
-    # Clear screen
     clear
-    echo -e "\nGoodbye!"
+    echo "Goodbye!"
     exit 0
+}
+
+restore_terminal() {
+    stty "$saved_stty" 2>/dev/null
+    # Reset colors and show the cursor again
+    printf '\033[0m\033[?25h'
 }
 
 # Function to get letter ASCII art
@@ -248,164 +236,74 @@ get_max_length() {
     echo $max_len
 }
 
-# Function to pad a line to a specific width
-pad_line() {
-    local line="$1"
-    local width="$2"
-    printf "%-*s" "$width" "$line"
+# A big heart, drawn with '#' so padding stays byte-safe; '#' becomes a heart when printed
+HEART_ART=" ###   ### 
+##### #####
+###########
+ ######### 
+  #######  
+   #####   
+    ###    
+     #     "
+
+# Print ASCII art side by side repeat_count times in one color
+print_art() {
+    local art="$1"
+    local color="$2"
+    local repeat_count="$3"
+    local max_length=$(get_max_length "$art")
+    local line row padded j
+
+    printf '\033[1;%sm' "$color"
+    while IFS= read -r line; do
+        row=""
+        for ((j=1; j<=repeat_count; j++)); do
+            printf -v padded "%-*s" "$max_length" "$line"
+            row+="$padded"
+            if [ $j -lt $repeat_count ]; then
+                row+="  "
+            fi
+        done
+        echo "${row//\#/♥}"
+    done <<< "$art"
+    printf '\033[0m'
 }
 
-# ASCII art function for letters and numbers
+# Print a row of little hearts, each a different color
+print_heart_row() {
+    local count="$1"
+    local i
+    for ((i=1; i<=count; i++)); do
+        printf '\033[1;%sm♥ ' "${colors[$RANDOM % ${#colors[@]}]}"
+    done
+    printf '\033[0m\n\n'
+}
+
+# Letters and numbers get big art with hearts underneath; every other key is a big heart
 print_big_letter() {
     local letter="$1"
     local color="$2"
     local repeat_count="${3:-1}"
-    
+    local art=""
+
     case "$letter" in
-        [A-Za-z])
-            # Convert to uppercase
-            local upper_letter=$(echo "$letter" | tr '[:lower:]' '[:upper:]')
-            
-            # Get the art for this letter
-            local art=$(get_letter_art "$upper_letter")
-            
-            if [ -n "$art" ]; then
-                echo -e "\033[${color}m"
-                
-                # Get the maximum line length for padding
-                local max_length=$(get_max_length "$art")
-                
-                # Print each line repeated
-                while IFS= read -r line; do
-                    for ((j=1; j<=repeat_count; j++)); do
-                        pad_line "$line" "$max_length"
-                        if [ $j -lt $repeat_count ]; then
-                            echo -n "  "
-                        fi
-                    done
-                    echo
-                done <<< "$art"
-                
-                echo -e "\033[0m"
-            else
-                # Fallback for unknown letters
-                echo -e "\033[${color}m"
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n "  $letter$letter$letter$letter$letter  "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n "$letter$letter$letter$letter$letter$letter$letter$letter$letter"
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n "  $letter$letter$letter$letter$letter  "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                echo -e "\033[0m"
-            fi
-            ;;
-        [0-9])
-            # Get the art for this number
-            local art=$(get_number_art "$letter")
-            
-            if [ -n "$art" ]; then
-                echo -e "\033[${color}m"
-                
-                # Get the maximum line length for padding
-                local max_length=$(get_max_length "$art")
-                
-                # Print each line repeated
-                while IFS= read -r line; do
-                    for ((j=1; j<=repeat_count; j++)); do
-                        pad_line "$line" "$max_length"
-                        if [ $j -lt $repeat_count ]; then
-                            echo -n "  "
-                        fi
-                    done
-                    echo
-                done <<< "$art"
-                
-                echo -e "\033[0m"
-            else
-                # Fallback for unknown numbers
-                echo -e "\033[${color}m"
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n "  $letter$letter$letter$letter$letter  "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n "$letter$letter$letter$letter$letter$letter$letter$letter$letter"
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n " $letter$letter$letter$letter$letter$letter$letter "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                for ((i=1; i<=repeat_count; i++)); do
-                    echo -n "  $letter$letter$letter$letter$letter  "
-                    if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-                done
-                echo
-                echo -e "\033[0m"
-            fi
-            ;;
-        *)
-            # For non-letters, create a simple block pattern
-            echo -e "\033[${color}m"
-            for ((i=1; i<=repeat_count; i++)); do
-                echo -n "  $letter$letter$letter$letter$letter  "
-                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-            done
-            echo
-            for ((i=1; i<=repeat_count; i++)); do
-                echo -n " $letter$letter$letter$letter$letter$letter$letter "
-                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-            done
-            echo
-            for ((i=1; i<=repeat_count; i++)); do
-                echo -n "$letter$letter$letter$letter$letter$letter$letter$letter$letter"
-                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-            done
-            echo
-            for ((i=1; i<=repeat_count; i++)); do
-                echo -n " $letter$letter$letter$letter$letter$letter$letter "
-                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-            done
-            echo
-            for ((i=1; i<=repeat_count; i++)); do
-                echo -n "  $letter$letter$letter$letter$letter  "
-                if [ $i -lt $repeat_count ]; then echo -n "  "; fi
-            done
-            echo
-            echo -e "\033[0m"
-            ;;
+        [A-Za-z]) art=$(get_letter_art "$(echo "$letter" | tr '[:lower:]' '[:upper:]')") ;;
+        [0-9]) art=$(get_number_art "$letter") ;;
     esac
+
+    echo
+    if [ -n "$art" ]; then
+        print_art "$art" "$color" "$repeat_count"
+        echo
+        print_heart_row $((repeat_count * 4))
+    else
+        print_art "$HEART_ART" "$color" "$repeat_count"
+        echo
+    fi
 }
 
 # Color list
-colors=(31 32 33 34 35 36 37)
+colors=(31 32 33 34 35 36 91 92 93 94 95 96)
 
 # Parse command line arguments
 repeat_count=5
@@ -440,32 +338,44 @@ if [ "$test_mode" = true ]; then
     exit 0
 fi
 
+# Child-proof the terminal: no echo, no line buffering, and no special keys.
+# -isig makes Ctrl+C/Ctrl+Z/Ctrl+\ plain keypresses, -ixon stops Ctrl+S from
+# freezing the screen, -iexten disables Ctrl+V and Ctrl+O.
+saved_stty=$(stty -g)
+trap restore_terminal EXIT
+trap '' INT TERM TSTP TTIN TTOU QUIT
+stty -echo -icanon -isig -ixon -iexten min 1 time 0
+printf '\033[?25l'
+clear
+
+# Read one keypress, including Enter, space, and backslash
+read_key() {
+    IFS= read -rsn1 -d '' "$@"
+}
+
 while true; do
-    read -n1 key
+    read_key key || continue
 
-    if [ "$key" != "" ]; then
-        # Check for exit sequence: requires a very specific, non-sequential combination
-        # This is virtually impossible for a toddler to trigger accidentally
-        if [ "$key" = "z" ] || [ "$key" = "Z" ]; then
-            # First step: check for '9' within 1 second (number, not letter)
-            echo -n "Press '9' within 1 second to continue exit sequence: "
-            read -t 1 -n1 step1
-            if [ "$step1" = "9" ]; then
-                # Second step: check for '!' within 1 second (symbol, requires shift)
-                echo -n "Press '!' (shift+1) within 1 second to exit: "
-                read -t 1 -n1 step2
-                if [ "$step2" = "!" ]; then
-                    cleanup
-                    exit 0
-                fi
-            fi
-            echo  # New line after the prompt
-        fi
-        
-        # Random color
-        color=${colors[$RANDOM % ${#colors[@]}]}
-
-        # Print big colored letter with specified repeat count
-        print_big_letter "$key" "$color" "$repeat_count"
+    # Arrow and function keys send an escape sequence; swallow the rest of it
+    if [ "$key" = $'\e' ]; then
+        while read_key -t 0.02 _; do :; done
     fi
+
+    # Silent adult exit: z, then 9, then ! (shift+1), each within 1 second
+    if [ "$key" = "z" ] || [ "$key" = "Z" ]; then
+        if read_key -t 1 step1 && [ "$step1" = "9" ]; then
+            if read_key -t 1 step2 && [ "$step2" = "!" ]; then
+                cleanup
+            fi
+        fi
+    fi
+
+    # Random color
+    color=${colors[$RANDOM % ${#colors[@]}]}
+
+    # Print big colored letter with specified repeat count
+    print_big_letter "$key" "$color" "$repeat_count"
+
+    # Drop keys mashed while drawing so the screen doesn't lag behind
+    while read -t 0; do read_key _; done
 done

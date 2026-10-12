@@ -21,12 +21,13 @@ The application serves as an educational tool for:
 - **Color Variety**: Randomly cycles through 7 different colors (red, green, yellow, blue, magenta, cyan, white)
 - **Character Repetition**: Configurable number of character repetitions per line (default: 5)
 - **External Art Files**: Uses `letters.txt` and `numbers.txt` files for custom ASCII art representations
-- **Fallback Patterns**: Creates simple block patterns for non-letter/non-number characters
+- **Hearts**: Letters and numbers get a row of rainbow hearts underneath; every other key shows big hearts
 
 ### Child Safety Features
 
 - **Signal Blocking**: Disables most interrupt signals (Ctrl+C, Ctrl+Z, etc.)
-- **Adult Exit**: Allows exit only via Ctrl+\ (SIGQUIT)
+- **Adult Exit**: Allows exit only via a silent z, 9, ! sequence, each key within 1 second
+- **Kiosk Mode**: `kiosk-setup.sh` locks a Linux laptop to the app on the text console
 - **Input Buffering**: Prevents input overflow and terminal corruption
 - **Terminal Restoration**: Properly restores terminal settings on exit
 
@@ -136,7 +137,7 @@ Starts the interactive mode where pressing any key displays the corresponding le
 
 - Prevents accidental script termination
 - Blocks common interrupt signals
-- Requires specific key combination (Ctrl+\) for exit
+- Requires a specific silent key sequence (z, 9, !) for exit
 
 ### Terminal Safety
 
