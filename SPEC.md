@@ -19,7 +19,6 @@ The application serves as an educational tool for:
 
 - **Interactive Character Display**: Shows large ASCII art letters and numbers when keys are pressed
 - **Color Variety**: Randomly cycles through 7 different colors (red, green, yellow, blue, magenta, cyan, white)
-- **Character Repetition**: Configurable number of character repetitions per line (default: 5)
 - **External Art Files**: Uses `letters.txt` and `numbers.txt` files for custom ASCII art representations
 - **Hearts**: Letters and numbers get a row of rainbow hearts underneath; every other key shows big hearts
 
@@ -34,7 +33,6 @@ The application serves as an educational tool for:
 ### Technical Features
 
 - **Test Mode**: Allows testing specific characters without interactive mode
-- **Configurable Repetition**: Command-line option to set character repetition count
 - **Terminal Compatibility**: Works with standard Unix-like terminals
 - **Error Handling**: Graceful handling of missing files and edge cases
 
@@ -51,28 +49,21 @@ Starts the interactive mode where pressing any key displays the corresponding le
 ### Command Line Options
 
 ```bash
-./toddler.sh [-n|--number COUNT] [test [CHARACTER]]
+./toddler.sh [test [CHARACTER]]
 ```
 
 #### Options:
 
-- `-n, --number COUNT`: Set the number of character repetitions per line (default: 5)
-- `test [CHARACTER]`: Test mode - display one character and exit (default character: A)
+- `test [CHARACTER]`: Test mode - print one row of a character and exit (default character: A)
 
 #### Examples:
 
 ```bash
-# Display 3 characters per line
-./toddler.sh -n 3
-
-# Test the letter 'B' with default repetition
+# Test the letter 'B'
 ./toddler.sh test B
 
-# Test the number '5' with default repetition
+# Test the number '5'
 ./toddler.sh test 5
-
-# Test the letter 'A' with 7 repetitions
-./toddler.sh -n 7 test A
 ```
 
 ## Dependencies
@@ -109,7 +100,7 @@ Starts the interactive mode where pressing any key displays the corresponding le
 - **Numbers 0-9**: Uses embedded ASCII art functions
 - **Other Characters**: Generates simple block patterns
 - **Padding**: Automatically pads lines to maintain alignment
-- **Repetition**: Configurable horizontal repetition with spacing
+- **Repetition**: Copies fill the screen width, centered
 
 ## Error Handling
 

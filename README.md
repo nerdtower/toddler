@@ -4,7 +4,7 @@ A child-friendly interactive terminal application designed to help toddlers lear
 
 ## What it does
 
-When a child presses a letter or number key, a row of that character in ASCII art scrolls up across the whole screen, each copy a different color, with a row of rainbow hearts underneath. Every other key (space, Enter, arrows, punctuation) scrolls a row of big hearts; holding space down keeps them coming. Perfect for:
+When a child presses a letter or number key, a row of big solid letters glides up across the whole screen in rainbow order, with a strip of little hearts underneath. Every other key (space, Enter, arrows, punctuation) scrolls a row of big hearts; holding a key down speeds the rows up into rainbow stripes. Perfect for:
 
 - Letter and number recognition and learning
 - Keyboard familiarization
@@ -23,8 +23,6 @@ chmod +x toddler.sh
 # Test a specific character
 ./toddler.sh test A
 
-# Display 3 characters per line
-./toddler.sh -n 3
 ```
 
 ## Features
@@ -32,25 +30,21 @@ chmod +x toddler.sh
 - **Interactive**: Press any key to see colorful ASCII art or hearts
 - **Child-safe**: Only a quick z, 9, ! sequence exits (prevents accidental termination)
 - **Portable**: Single file with minimal dependencies
-- **Configurable**: Adjust character repetition count
 - **Test mode**: Preview specific characters
 
 ## Requirements
 
-- Bash shell (compatible with older versions)
+- Bash 5
 - Unix-like operating system (Linux, macOS, BSD)
 - Terminal with color support
 
 ## Usage
 
 ```bash
-./toddler.sh [-n|--number COUNT] [test [CHARACTER]]
+./toddler.sh [test [CHARACTER]]
 ```
 
-### Options:
-
-- `-n, --number COUNT`: Number of characters per line (default: 5)
-- `test [CHARACTER]`: Test mode - display one character and exit
+- `test [CHARACTER]`: Test mode - print one row of a character and exit
 
 ### Examples:
 
@@ -58,21 +52,17 @@ chmod +x toddler.sh
 # Interactive mode with default settings
 ./toddler.sh
 
-# Display 3 characters per line
-./toddler.sh -n 3
 
 # Test the letter 'B'
 ./toddler.sh test B
 
-# Test the number '5' with 7 repetitions
-./toddler.sh -n 7 test 5
 ```
 
 ## Safety Features
 
 - **Special keys are harmless**: Ctrl+C, Ctrl+Z, Ctrl+\, Ctrl+S (screen freeze), Ctrl+V and arrow/function keys can't stop or freeze the app
-- **Adult exit**: press `z`, then `9`, then `!` (shift+1), each within a second. Nothing appears on screen while you do it
-- **Mashing stays snappy**: keys pressed while drawing are dropped so the screen never lags behind
+- **Adult exit**: type `z`, `9`, `!` (shift+1) within 2 seconds. Nothing special appears on screen while you do it
+- **Mashing stays snappy**: only the newest key pressed while a row is drawing is kept, so the screen never lags behind
 - **Terminal restoration**: terminal settings and the cursor come back on exit
 
 ## Kiosk mode (Linux)

@@ -4,6 +4,8 @@
 # Copyright (c) 2024 Nerd Tower LLC
 # Licensed under the MIT License - see LICENSE file for details
 #
+# Needs bash 5 (associative arrays, fractional read timeouts, EPOCHREALTIME).
+
 cleanup() {
     clear
     echo "Goodbye!"
@@ -16,227 +18,335 @@ restore_terminal() {
     printf '\033[0m\033[?25h'
 }
 
-# Function to get letter ASCII art
-get_letter_art() {
-    local letter="$1"
-    case "$letter" in
-        A) echo "    A    
-   A A   
-  AAAAA  
- A     A 
-A       A" ;;
-        B) echo "BBBBB  
-B     B
-BBBBB  
-B     B
-BBBBB  " ;;
-        C) echo " CCCCC 
-C     C
-C      
-C      
-C     C
- CCCCC " ;;
-        D) echo "DDDDD  
-D     D
-D     D
-D     D
-DDDDD  " ;;
-        E) echo "EEEEE
-E    
-EEEE 
-E    
-EEEEE" ;;
-        F) echo "FFFFF
-F    
-FFFF 
-F    
-F    " ;;
-        G) echo " GGGGG 
-G     G
-G      
-G   GGG
-G     G
- GGGGG " ;;
-        H) echo "H     H
-H     H
-HHHHHHH
-H     H
-H     H" ;;
-        I) echo "IIIII
-  I  
-  I  
-  I  
-IIIII" ;;
-        J) echo "     J
-     J
-     J
-J    J
- JJJJ " ;;
-        K) echo "K   K
-K  K 
-KKK  
-K  K 
-K   K" ;;
-        L) echo "L    
-L    
-L    
-L    
-LLLLL" ;;
-        M) echo "M     M
-MM   MM
-M M M M
-M  M  M
-M     M" ;;
-        N) echo "N     N
-NN    N
-N N   N
-N  N  N
-N     N" ;;
-        O) echo " OOOOO 
-O     O
-O     O
-O     O
- OOOOO " ;;
-        P) echo "PPPPPP 
-P     P
-PPPPPP 
-P      
-P      " ;;
-        Q) echo " QQQQQ 
-Q     Q
-Q     Q
-Q   Q Q
- QQQQQ 
-      Q" ;;
-        R) echo "RRRRRR 
-R     R
-RRRRRR 
-R   R  
-R     R" ;;
-        S) echo " SSSSS 
-S     S
- SSSSS 
-      S
-S     S
- SSSSS " ;;
-        T) echo "TTTTTTT
-   T   
-   T   
-   T   
-   T   " ;;
-        U) echo "U     U
-U     U
-U     U
-U     U
- UUUUU " ;;
-        V) echo "V     V
-V     V
-V     V
- V   V 
-  V V  
-   V   " ;;
-        W) echo "W     W
-W     W
-W  W  W
-W W W W
-WW   WW" ;;
-        X) echo "X     X
- X   X 
-  X X  
- X   X 
-X     X" ;;
-        Y) echo "Y     Y
- Y   Y 
-  Y Y  
-   Y   
-   Y   " ;;
-        Z) echo "ZZZZZZZ
-     Z 
-   Z   
- Z     
-ZZZZZZZ " ;;
-        *) echo "" ;;
-    esac
-}
+# Letters and numbers as solid half-block art, rendered from DejaVu Sans Bold.
+# '#' is a full block, "'" the top half, ',' the bottom half.
+declare -A GLYPHS
+GLYPHS[A]="     ,#####,     
+     #######     
+    #### ####    
+   ,###' '###,   
+   ###'   '###,  
+  #############  
+ ####       #### 
+,###'       '###,
+                 "
+GLYPHS[B]="##########,  
+####    #### 
+####    ####'
+####,,,,###' 
+####''''####,
+####     ####
+####    ,####
+##########'' 
+             "
+GLYPHS[C]="   ,,########,
+ ,####'    ''#
+,####         
+####          
+####          
+'####         
+ '####,    ,,#
+   ''########'
+              "
+GLYPHS[D]="##########,,   
+####    '####, 
+####      '###,
+####       ####
+####       ####
+####      ,###'
+####    ,####' 
+##########''   
+               "
+GLYPHS[E]="###########
+####       
+####       
+####,,,,,,,
+####'''''''
+####       
+####       
+###########
+           "
+GLYPHS[F]="###########
+####       
+####       
+####,,,,,,,
+####'''''''
+####       
+####       
+####       
+           "
+GLYPHS[G]="   ,,,#######,,
+ ,####'     ''#
+,####          
+####     ,,,,,,
+####     '''###
+'####       ###
+ '####,    ,###
+   ''########''
+               "
+GLYPHS[H]="####      ####
+####      ####
+####      ####
+####,,,,,,####
+####''''''####
+####      ####
+####      ####
+####      ####
+              "
+GLYPHS[I]="##########
+   ####   
+   ####   
+   ####   
+   ####   
+   ####   
+   ####   
+##########
+          "
+GLYPHS[J]=" ####
+ ####
+ ####
+ ####
+ ####
+ ####
+ ####
+ ####
+,####"
+GLYPHS[K]="####     ,###' 
+####   ,###'   
+####,,###'     
+#######'       
+########,      
+#### '####,    
+####   '####,  
+####     '####,
+               "
+GLYPHS[L]="####       
+####       
+####       
+####       
+####       
+####       
+####       
+###########
+           "
+GLYPHS[M]="#####,      ######
+######,    ,######
+#######,  ,##'####
+#### ### ,### ####
+####  ######  ####
+####   ####   ####
+####   '''    ####
+####          ####
+                  "
+GLYPHS[N]="#####     ####
+######,   ####
+#######,  ####
+#### ###, ####
+####  ###,####
+####   #######
+####    ######
+####     '####
+              "
+GLYPHS[O]="   ,,#######,,   
+ ,###''   '####  
+,####       #### 
+####        ####,
+####        ####'
+'####       #### 
+ '###,,   ,####  
+   ''#######''   
+                 "
+GLYPHS[P]="##########,, 
+####    '####
+####     ####
+####    ,####
+##########'' 
+####         
+####         
+####         
+             "
+GLYPHS[Q]="   ,,#######,,   
+ ,###''   '####  
+,####       #### 
+####        ####,
+####        ####'
+'####       #### 
+ '###,,   ,####' 
+   ''#######''   
+         '###,   "
+GLYPHS[R]="##########,   
+####   '####  
+####    ####  
+####   ,####  
+##########,   
+####   '####  
+####    '#### 
+####     '####
+              "
+GLYPHS[S]=" ,,######## 
+###'    ''# 
+###,        
+#######,,,  
+ '''#######,
+       '####
+#,,    ,####
+'########'' 
+            "
+GLYPHS[T]="###############
+     #####     
+     #####     
+     #####     
+     #####     
+     #####     
+     #####     
+     #####     
+               "
+GLYPHS[U]="####      ####
+####      ####
+####      ####
+####      ####
+####      ####
+####      ####
+'####    #### 
+  ''######''  
+              "
+GLYPHS[V]="'###,       ,###'
+ ####,      #### 
+  ####     ####  
+   ####   ####'  
+   '###, ,###'   
+    ####,####    
+     #######     
+     '#####'     
+                 "
+GLYPHS[W]="####     ####     ,###
+####    ,#####    ####
+ ####   ###'##   ,###'
+ ####  ,##  ###  #### 
+  #### ###  ### ,###' 
+  ####,##'   #######  
+   ######    ######'  
+   #####'     #####   
+                      "
+GLYPHS[X]="'###,     ,###'
+ '####   ####' 
+   ####,####   
+    '#####'    
+    ,#####,    
+  ,####'####   
+ ,###'   '###, 
+####'     '###,
+               "
+GLYPHS[Y]="'####      ####'
+ '####,  ,####  
+   ####,,####   
+    '######'    
+     '####'     
+      ####      
+      ####      
+      ####      
+                "
+GLYPHS[Z]="##############
+       ,#####'
+      ,#####  
+    ,#####'   
+   ,#####     
+ ,#####'      
+,####'        
+##############
+              "
+GLYPHS[0]="  ,,#####,,  
+ ####   '### 
+,###     ####
+####     ####
+####     ####
+'###     ####
+ ####   ,### 
+  ''#####''  
+             "
+GLYPHS[1]=",,######    
+ '  ####    
+    ####    
+    ####    
+    ####    
+    ####    
+    ####    
+ ###########
+            "
+GLYPHS[2]=",,######,, 
+#''   '####
+       ####
+      ,####
+     ,###' 
+   ,###'   
+,####'     
+###########
+           "
+GLYPHS[3]=" ,,######,,  
+ ''    '#### 
+        #### 
+   ,,,,###'  
+   ''''####, 
+        ####,
+ ,     ,#### 
+''#######''  
+             "
+GLYPHS[4]="     ,#####  
+    ,######  
+  ,### ####  
+ ,##'  ####  
+###'   ####  
+#############
+       ####  
+       ####  
+             "
+GLYPHS[5]="########### 
+####        
+####        
+#########,  
+''    '####,
+        ####
+,     ,####'
+'#######''  
+            "
+GLYPHS[6]="   ,,######, 
+ ,###'     ' 
+ ####,,,,,   
+######''#### 
+#####    ####
+ ####    ####
+ '###,  ,###'
+   '######'  
+             "
+GLYPHS[7]="#############
+        #### 
+       ####' 
+      ####'  
+     ####'   
+    ,###'    
+   ,###'     
+  ,####      
+             "
+GLYPHS[8]="  ,#######,, 
+ ####   '###,
+ ####    ###'
+ ''##,,,###' 
+ ,###'''###, 
+,###     ####
+'###,   ,####
+  '#######'' 
+             "
+GLYPHS[9]="  ,,#####,,  
+ ###'   ###, 
+####    ####,
+####    #####
+ '###,,,#####
+   ''''' ###'
+ ,     ,###' 
+ ''#####''   
+             "
 
-# Function to get number ASCII art
-get_number_art() {
-    local number="$1"
-    case "$number" in
-        0) echo " 0000 
-0    0
-0    0
-0    0
- 0000 " ;;
-        1) echo "  11  
- 111  
-  11  
-  11  
- 1111 " ;;
-        2) echo " 2222 
-2    2
-    2 
-   2  
-  2   
-222222" ;;
-        3) echo " 3333 
-3    3
-    3 
- 3333 
-3    3
- 3333 " ;;
-        4) echo "4   4 
-4   4 
-4   4 
-444444
-    4 
-    4 " ;;
-        5) echo "555555
-5     
-55555 
-     5
-5    5
- 5555 " ;;
-        6) echo " 6666 
-6     
-6     
-66666 
-6    6
- 6666 " ;;
-        7) echo "777777
-     7
-    7 
-   7  
-  7   
- 7    " ;;
-        8) echo " 8888 
-8    8
- 8888 
-8    8
- 8888 " ;;
-        9) echo " 9999 
-9    9
- 99999
-     9
-9    9
- 9999 " ;;
-        *) echo "" ;;
-    esac
-}
-
-# Function to get maximum line length from an array of lines
-get_max_length() {
-    local max_len=0
-    while IFS= read -r line; do
-        local len=${#line}
-        if [ $len -gt $max_len ]; then
-            max_len=$len
-        fi
-    done <<< "$1"
-    echo $max_len
-}
-
-# A big heart, drawn with '#' so padding stays byte-safe; '#' becomes a heart when printed
+# A big heart; '#' becomes a heart when printed
 HEART_ART=" ###   ### 
 ##### #####
 ###########
@@ -246,151 +356,125 @@ HEART_ART=" ###   ###
     ###    
      #     "
 
-# Print ASCII art side by side repeat_count times in one color
-print_art() {
-    local art="$1"
-    local color="$2"
-    local repeat_count="$3"
-    local max_length=$(get_max_length "$art")
-    local line row padded j
+# Rainbow order: red, yellow, green, cyan, blue, magenta (bold makes them bright)
+rainbow=(31 33 32 36 34 35)
+row_number=0
 
-    printf '\033[1;%sm' "$color"
-    while IFS= read -r line; do
-        row=""
-        for ((j=1; j<=repeat_count; j++)); do
-            printf -v padded "%-*s" "$max_length" "$line"
-            row+="$padded"
-            if [ $j -lt $repeat_count ]; then
-                row+="  "
-            fi
-        done
-        echo "${row//\#/♥}"
-    done <<< "$art"
-    printf '\033[0m'
+# Seconds between the lines of a row as it glides in: on its own, and while
+# keys are held or mashed
+GLIDE_DELAY=0.035
+GLIDE_DELAY_HELD=0.006
+
+cols=80
+update_size() {
+    local size
+    size=$(stty size 2>/dev/null) && cols=${size#* }
 }
 
-# Print a row of little hearts, each a different color
-print_heart_row() {
-    local count="$1"
-    local i
-    for ((i=1; i<=count; i++)); do
-        printf '\033[1;%sm♥ ' "${colors[$RANDOM % ${#colors[@]}]}"
-    done
-    printf '\033[0m\n\n'
-}
-
-# Letters and numbers get big art with hearts underneath; every other key is a big heart
-print_big_letter() {
-    local letter="$1"
-    local color="$2"
-    local repeat_count="${3:-1}"
-    local art=""
-
-    case "$letter" in
-        [A-Za-z]) art=$(get_letter_art "$(echo "$letter" | tr '[:lower:]' '[:upper:]')") ;;
-        [0-9]) art=$(get_number_art "$letter") ;;
-    esac
-
-    echo
-    if [ -n "$art" ]; then
-        print_art "$art" "$color" "$repeat_count"
-        echo
-        print_heart_row $((repeat_count * 4))
-    else
-        print_art "$HEART_ART" "$color" "$repeat_count"
-        echo
+# Read one key into KEY, including Enter, space, and backslash. Swallows the
+# rest of arrow/function key escape sequences, and watches for the adult exit:
+# z, 9, ! (shift+1) typed within 2 seconds. Never blocks waiting for the next
+# key, so z draws like any other letter.
+take_key() {
+    local now
+    IFS= read -rsn1 -d '' "$@" KEY || return 1
+    if [ "$KEY" = $'\e' ]; then
+        while IFS= read -rsn1 -d '' -t 0.02 _; do :; done
     fi
+
+    now=${EPOCHREALTIME//[.,]/}
+    if [ "$KEY" = "!" ] && [ "$last_key" = "9" ] &&
+        { [ "$key_before_last" = "z" ] || [ "$key_before_last" = "Z" ]; } &&
+        [ $((now - key_before_last_time)) -lt 2000000 ]; then
+        cleanup
+    fi
+    key_before_last=$last_key
+    key_before_last_time=$last_key_time
+    last_key=$KEY
+    last_key_time=$now
 }
 
-# Art for a key: letters and numbers get their own, everything else is a heart
-art_for_key() {
-    case "$1" in
-        [A-Za-z]) get_letter_art "${1^^}" ;;
-        [0-9]) get_number_art "$1" ;;
-        *) echo "$HEART_ART" ;;
-    esac
-}
-
-# Scroll in one row of art repeated across the whole screen, centered, each copy
-# its own color. Letters and numbers get a row of little hearts underneath.
+# Scroll in one row of art repeated across the screen, centered, in rainbow
+# order. Letters and numbers get a strip of little hearts underneath. With a
+# delay, the row glides in a line at a time; a key pressed meanwhile is saved
+# in pending and speeds up the rest of the row.
 scroll_row() {
-    local key="$1"
-    local art size cols width count pad padding line padded i out
-    local -a copy_colors
-    art=$(art_for_key "$key")
-    size=$(stty size)
-    cols=${size#* }
-    width=$(get_max_length "$art")
+    local key="$1" delay="$2"
+    local art width cell gap count total pad left right line out i start
+    case "$key" in
+        [A-Za-z0-9]) art=${GLYPHS[${key^^}]} ;;
+        *) art=$HEART_ART ;;
+    esac
 
-    # Copies are separated by a gap of 2
-    count=$(( (cols + 2) / (width + 2) ))
+    # Art is ASCII until it's printed, so lengths and padding are byte-safe
+    line=${art%%$'\n'*}
+    width=${#line}
+    if [ "$art" = "$HEART_ART" ]; then
+        cell=$width
+        gap=2
+    else
+        cell=$((width > 16 ? width : 16))
+        gap=3
+    fi
+    count=$(( (cols + gap) / (cell + gap) ))
     if [ $count -lt 1 ]; then
         count=1
     fi
-    pad=$(( (cols - count * (width + 2) + 2) / 2 ))
-    if [ $pad -lt 0 ]; then
-        pad=0
-    fi
-    printf -v padding '%*s' "$pad" ''
-    for ((i=0; i<count; i++)); do
-        copy_colors[i]=${colors[RANDOM % ${#colors[@]}]}
-    done
+    total=$((count * (cell + gap) - gap))
+    printf -v pad '%*s' $(( cols > total ? (cols - total) / 2 : 0 )) ''
+    printf -v left '%*s' $(( (cell - width) / 2 )) ''
+    printf -v right '%*s' $(( cell - width - (cell - width) / 2 )) ''
 
-    out=$'\n'
-    while IFS= read -r line; do
-        printf -v padded '%-*s' "$width" "$line"
-        out+=$'\n'"$padding"
+    start=$((row_number % ${#rainbow[@]}))
+    row_number=$((row_number + 1))
+
+    # Art comes in on fd 3 so take_key below still reads the keyboard
+    printf '\n'
+    while IFS= read -r -u 3 line; do
+        if [ "$art" = "$HEART_ART" ]; then
+            line=${line//\#/♥}
+        else
+            line=${line//\#/█}
+            line=${line//\'/▀}
+            line=${line//,/▄}
+        fi
+        out="$pad"
         for ((i=0; i<count; i++)); do
             if [ $i -gt 0 ]; then
-                out+="  "
+                printf -v out '%s%*s' "$out" "$gap" ''
             fi
-            out+=$'\e[1;'"${copy_colors[i]}m${padded//\#/♥}"
+            out+=$'\e[1;'"${rainbow[(start + i) % ${#rainbow[@]}]}m${left}${line}${right}"
         done
-    done <<< "$art"
+        printf '\n%s\033[0m' "$out"
+
+        if [ -n "$delay" ] && take_key -t "$delay"; then
+            pending=$KEY
+            delay=$GLIDE_DELAY_HELD
+        fi
+    done 3<<< "$art"
 
     if [ "$art" != "$HEART_ART" ]; then
-        out+=$'\n\n'"$padding"
-        for ((i=0; i<(count * (width + 2) - 2) / 2; i++)); do
-            out+=$'\e[1;'"${colors[RANDOM % ${#colors[@]}]}m♥ "
+        out="$pad"
+        for ((i=0; i<(total + 1) / 2; i++)); do
+            out+=$'\e[1;'"${rainbow[(start + i) % ${#rainbow[@]}]}m♥ "
         done
+        printf '\n%s\033[0m\n' "$out"
+    else
+        printf '\n'
     fi
-    printf '%s\033[0m\n' "$out"
 }
 
-# Color list
-colors=(31 32 33 34 35 36 91 92 93 94 95 96)
-
 # Parse command line arguments
-repeat_count=5
-test_mode=false
-test_letter=""
-
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -n|--number)
-            repeat_count="$2"
-            shift 2
-            ;;
-        test)
-            test_mode=true
-            test_letter="${2:-A}"
-            shift 2
-            ;;
-        *)
-            echo "Usage: $0 [-n|--number COUNT] [test [CHARACTER]]"
-            echo "  -n, --number COUNT: Test mode only - copies of the character per line (default: 5)"
-            echo "  test [CHARACTER]: Test mode - print one character and exit"
-            exit 1
-            ;;
-    esac
-done
-
-# Check if test mode is requested
-if [ "$test_mode" = true ]; then
-    # Test mode: output one letter and quit
-    color=${colors[$RANDOM % ${#colors[@]}]}
-    print_big_letter "$test_letter" "$color" "$repeat_count"
-    exit 0
+if [ $# -gt 0 ]; then
+    if [ "$1" = "test" ]; then
+        # Test mode: print one row and quit
+        update_size
+        scroll_row "${2:-A}" ""
+        exit 0
+    fi
+    echo "Usage: $0 [test [CHARACTER]]"
+    echo "  test [CHARACTER]: Test mode - print one row of a character and exit"
+    exit 1
 fi
 
 # Child-proof the terminal: no echo, no line buffering, and no special keys.
@@ -399,34 +483,30 @@ fi
 saved_stty=$(stty -g)
 trap restore_terminal EXIT
 trap '' INT TERM TSTP TTIN TTOU QUIT
+trap update_size WINCH
 stty -echo -icanon -isig -ixon -iexten min 1 time 0
 printf '\033[?25l'
 clear
+update_size
 
-# Read one keypress, including Enter, space, and backslash
-read_key() {
-    IFS= read -rsn1 -d '' "$@"
-}
-
+pending=""
 while true; do
-    read_key key || continue
-
-    # Arrow and function keys send an escape sequence; swallow the rest of it
-    if [ "$key" = $'\e' ]; then
-        while read_key -t 0.02 _; do :; done
+    if [ -n "$pending" ]; then
+        key=$pending
+        pending=""
+        delay=$GLIDE_DELAY_HELD
+    else
+        take_key || continue
+        key=$KEY
+        delay=$GLIDE_DELAY
     fi
 
-    # Silent adult exit: z, then 9, then ! (shift+1), each within 1 second
-    if [ "$key" = "z" ] || [ "$key" = "Z" ]; then
-        if read_key -t 1 step1 && [ "$step1" = "9" ]; then
-            if read_key -t 1 step2 && [ "$step2" = "!" ]; then
-                cleanup
-            fi
+    scroll_row "$key" "$delay"
+
+    # Keep only the newest key mashed while drawing so the screen never lags
+    while read -t 0; do
+        if take_key; then
+            pending=$KEY
         fi
-    fi
-
-    scroll_row "$key"
-
-    # Drop keys mashed while drawing so the screen doesn't lag behind
-    while read -t 0; do read_key _; done
+    done
 done
