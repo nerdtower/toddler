@@ -372,9 +372,10 @@ update_size() {
 }
 
 # Read one key into KEY, including Enter, space, and backslash. Swallows the
-# rest of arrow/function key escape sequences, and watches for the adult exit:
-# z, 9, ! (shift+1) typed within 2 seconds. Never blocks waiting for the next
-# key, so z draws like any other letter.
+# rest of arrow/function key escape sequences, and watches for the adult
+# sequences typed within 2 seconds: z, 9, ! (shift+1) exits, and z, 9, @
+# (shift+2) switches between hearts and hacker mode. Never blocks waiting for
+# the next key, so z draws like any other letter.
 take_key() {
     local now
     IFS= read -rsn1 -d '' "$@" KEY || return 1
@@ -383,10 +384,20 @@ take_key() {
     fi
 
     now=${EPOCHREALTIME//[.,]/}
-    if [ "$KEY" = "!" ] && [ "$last_key" = "9" ] &&
+    if [ "$last_key" = "9" ] &&
         { [ "$key_before_last" = "z" ] || [ "$key_before_last" = "Z" ]; } &&
         [ $((now - key_before_last_time)) -lt 2000000 ]; then
-        cleanup
+        if [ "$KEY" = "!" ]; then
+            cleanup
+        elif [ "$KEY" = "@" ]; then
+            last_key=""
+            if [ "$mode" = hacker ]; then
+                start_mode hearts
+            else
+                start_mode hacker
+            fi
+            return 1
+        fi
     fi
     key_before_last=$last_key
     key_before_last_time=$last_key_time
@@ -451,6 +462,9 @@ scroll_row() {
             pending=$KEY
             delay=$GLIDE_DELAY_HELD
         fi
+        if [ "$mode" != hearts ]; then
+            return
+        fi
     done 3<<< "$art"
 
     if [ "$art" != "$HEART_ART" ]; then
@@ -464,18 +478,196 @@ scroll_row() {
     fi
 }
 
+# Hacker mode: every key types the next few characters of a terminal session,
+# like the grown-up's screen. When a command is finished its output scrolls
+# out, then the next prompt appears. The session loops forever.
+#
+#   $ cmd          typed by keypresses; the lines after it are its output
+#   $! cmd         typed, then really run (harmless, read-only commands only)
+#   @SELF n        output is the first n lines of this script
+#   @PROGRESS txt  output is a progress bar that fills up by itself
+#   {r} {y} {g} {c} {b} {m} {0}   colors in output: red ... magenta, reset
+HACKER_CHARS_PER_KEY=3
+read -r -d '' HACKER_SESSION <<'EOF'
+$ cd ~/code/toddler
+$ git status
+On branch hearts
+Your branch is up to date with 'origin/hearts'.
+
+nothing to commit, working tree clean
+$! uname -a
+$ cat toddler.sh
+@SELF 32
+$! df -h
+$ ping -c 4 mainframe.local
+PING mainframe.local (10.0.0.42) 56(84) bytes of data.
+64 bytes from 10.0.0.42: icmp_seq=1 ttl=64 time=0.412 ms
+64 bytes from 10.0.0.42: icmp_seq=2 ttl=64 time=0.387 ms
+64 bytes from 10.0.0.42: icmp_seq=3 ttl=64 time=0.401 ms
+64 bytes from 10.0.0.42: icmp_seq=4 ttl=64 time=0.395 ms
+
+--- mainframe.local ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3004ms
+$ make hearts
+cc -O2 -Wall -c heart.c -o heart.o
+cc -O2 -Wall -c rainbow.c -o rainbow.o
+cc -O2 -Wall -c sparkle.c -o sparkle.o
+cc -o hearts heart.o rainbow.o sparkle.o
+$ ./hearts --rainbow
+{r}♥ ♥ ♥ {y}♥ ♥ ♥ {g}♥ ♥ ♥ {c}♥ ♥ ♥ {b}♥ ♥ ♥ {m}♥ ♥ ♥{0}
+$! free -h
+$ ssh mainframe.local
+@PROGRESS Hacking the mainframe
+{g}ACCESS GRANTED{0}
+$! ps -e | head -20
+$ clear
+EOF
+
+# Turn HACKER_SESSION into steps. PROMPT, SHOW, RUN, PROGRESS and CLEAR run on
+# their own; TYPE steps wait for keypresses.
+parse_hacker_session() {
+    local user host dir="~" line cmd last
+    user=$(id -un)
+    host=$(hostname 2>/dev/null || uname -n)
+    step_kind=()
+    step_text=()
+    while IFS= read -r line; do
+        last=$((${#step_kind[@]} - 1))
+        case "$line" in
+            '$ '*|'$! '*)
+                cmd=${line#\$ }
+                cmd=${cmd#\$! }
+                step_kind+=(PROMPT TYPE)
+                step_text+=($'\e[1;32m'"$user@$host"$'\e[0m:\e[1;34m'"$dir"$'\e[0m$ ' "$cmd")
+                if [ "${line:0:2}" = '$!' ]; then
+                    step_kind+=(RUN)
+                    step_text+=("$cmd")
+                elif [ "$cmd" = clear ]; then
+                    step_kind+=(CLEAR)
+                    step_text+=("")
+                fi
+                if [ "${cmd:0:3}" = "cd " ]; then
+                    dir=${cmd#cd }
+                fi
+                ;;
+            '@SELF '*)
+                step_kind+=(SHOW)
+                step_text+=("$(head -n "${line#@SELF }" "$0")")
+                ;;
+            '@PROGRESS '*)
+                step_kind+=(PROGRESS)
+                step_text+=("${line#@PROGRESS }")
+                ;;
+            *)
+                if [ "${step_kind[last]}" = SHOW ]; then
+                    step_text[last]+=$'\n'"$line"
+                else
+                    step_kind+=(SHOW)
+                    step_text+=("$line")
+                fi
+                ;;
+        esac
+    done <<< "$HACKER_SESSION"
+    step=0
+    typed=0
+}
+
+# Print command output a line at a time, quickly, so it scrolls like a real one
+show_output() {
+    local line
+    while IFS= read -r -u 3 line; do
+        line=${line//\{r\}/$'\e[1;31m'}
+        line=${line//\{y\}/$'\e[1;33m'}
+        line=${line//\{g\}/$'\e[1;32m'}
+        line=${line//\{c\}/$'\e[1;36m'}
+        line=${line//\{b\}/$'\e[1;34m'}
+        line=${line//\{m\}/$'\e[1;35m'}
+        line=${line//\{0\}/$'\e[0m'}
+        printf '%s\033[0m\n' "$line"
+        if take_key -t 0.012; then
+            pending=$KEY
+        fi
+        if [ "$mode" != hacker ]; then
+            return
+        fi
+    done 3<<< "$1"
+}
+
+# Run steps until the next one that needs typing
+run_hacker_steps() {
+    local i
+    while [ "$mode" = hacker ]; do
+        case "${step_kind[step]}" in
+            TYPE) return ;;
+            PROMPT) printf '%s' "${step_text[step]}" ;;
+            SHOW) show_output "${step_text[step]}" ;;
+            RUN) show_output "$(bash -c "${step_text[step]}" 2>&1 | head -n 30)" ;;
+            CLEAR) printf '\033[2J\033[H' ;;
+            PROGRESS)
+                printf '%s [' "${step_text[step]}"
+                for ((i=0; i<30; i++)); do
+                    printf '\033[1;32m#\033[0m'
+                    if take_key -t 0.04; then
+                        pending=$KEY
+                    fi
+                done
+                printf '] 100%%\n'
+                ;;
+        esac
+        step=$(( (step + 1) % ${#step_kind[@]} ))
+    done
+}
+
+# One keypress in hacker mode: type a few more characters, or with Enter
+# finish the command. A finished command runs its output and the next prompt.
+hacker_key() {
+    local key="$1" count=$HACKER_CHARS_PER_KEY text
+    if [ "$key" = $'\n' ] || [ "$key" = $'\r' ]; then
+        count=1000
+    fi
+    text=${step_text[step]}
+    printf '%s' "${text:typed:count}"
+    typed=$((typed + count))
+    if [ $typed -ge ${#text} ]; then
+        printf '\n'
+        typed=0
+        step=$(( (step + 1) % ${#step_kind[@]} ))
+        run_hacker_steps
+    fi
+}
+
+# Switch modes: hearts hides the cursor, hacker shows it like a real terminal
+start_mode() {
+    mode=$1
+    pending=""
+    printf '\033[2J\033[H'
+    if [ "$mode" = hacker ]; then
+        printf '\033[?25h'
+        parse_hacker_session
+        run_hacker_steps
+    else
+        printf '\033[?25l'
+    fi
+}
+
 # Parse command line arguments
-if [ $# -gt 0 ]; then
-    if [ "$1" = "test" ]; then
+mode=hearts
+case "${1:-}" in
+    "") ;;
+    --hacker) mode=hacker ;;
+    test)
         # Test mode: print one row and quit
         update_size
         scroll_row "${2:-A}" ""
         exit 0
-    fi
-    echo "Usage: $0 [test [CHARACTER]]"
-    echo "  test [CHARACTER]: Test mode - print one row of a character and exit"
-    exit 1
-fi
+        ;;
+    *)
+        echo "Usage: $0 [--hacker | test [CHARACTER]]"
+        echo "  --hacker: Start in hacker mode (every key types a pretend terminal session)"
+        echo "  test [CHARACTER]: Test mode - print one row of a character and exit"
+        exit 1
+        ;;
+esac
 
 # Child-proof the terminal: no echo, no line buffering, and no special keys.
 # -isig makes Ctrl+C/Ctrl+Z/Ctrl+\ plain keypresses, -ixon stops Ctrl+S from
@@ -485,11 +677,9 @@ trap restore_terminal EXIT
 trap '' INT TERM TSTP TTIN TTOU QUIT
 trap update_size WINCH
 stty -echo -icanon -isig -ixon -iexten min 1 time 0
-printf '\033[?25l'
-clear
 update_size
+start_mode "$mode"
 
-pending=""
 while true; do
     if [ -n "$pending" ]; then
         key=$pending
@@ -501,7 +691,11 @@ while true; do
         delay=$GLIDE_DELAY
     fi
 
-    scroll_row "$key" "$delay"
+    if [ "$mode" = hacker ]; then
+        hacker_key "$key"
+    else
+        scroll_row "$key" "$delay"
+    fi
 
     # Keep only the newest key mashed while drawing so the screen never lags
     while read -t 0; do

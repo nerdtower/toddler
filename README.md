@@ -25,6 +25,12 @@ chmod +x toddler.sh
 
 ```
 
+## Hacker mode
+
+`./toddler.sh --hacker` starts in hacker mode: every key types the next few characters of a pretend terminal session (git, ping, make, `ssh mainframe` with a progress bar and ACCESS GRANTED), so button mashing looks like a grown-up typing. Enter finishes the current command. A few commands (`uname -a`, `df -h`, `free -h`, `ps -e`) really run, so their output is real. The session lives in `HACKER_SESSION` in `toddler.sh` and is easy to edit.
+
+Switch between hearts and hacker mode at any time with `z`, `9`, `@` (shift+2) within 2 seconds. This works in kiosk mode too.
+
 ## Features
 
 - **Interactive**: Press any key to see colorful ASCII art or hearts
@@ -41,9 +47,10 @@ chmod +x toddler.sh
 ## Usage
 
 ```bash
-./toddler.sh [test [CHARACTER]]
+./toddler.sh [--hacker | test [CHARACTER]]
 ```
 
+- `--hacker`: Start in hacker mode
 - `test [CHARACTER]`: Test mode - print one row of a character and exit
 
 ### Examples:
