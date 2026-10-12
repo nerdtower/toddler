@@ -4,7 +4,7 @@ A child-friendly interactive terminal application designed to help toddlers lear
 
 ## What it does
 
-When a child presses a letter or number key, it fills the screen as a giant colored letter. On the next key it shrinks to a sticker at a random spot, so the screen fills up like a sticker book; when it's full, a burst of hearts clears it. Holding space scrolls rows of rainbow hearts across the screen, and every other key (Enter, arrows, punctuation) shows a giant heart. Perfect for:
+When a child presses a letter or number key, a row of that character in ASCII art scrolls up across the whole screen, each copy a different color, with a row of rainbow hearts underneath. Every other key (space, Enter, arrows, punctuation) scrolls a row of big hearts; holding space down keeps them coming. Perfect for:
 
 - Letter and number recognition and learning
 - Keyboard familiarization
