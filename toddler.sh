@@ -302,6 +302,181 @@ print_big_letter() {
     fi
 }
 
+# A small heart for stickers
+STICKER_HEART_ART=" ## ## 
+#######
+ ##### 
+  ###  
+   #   "
+
+# Art for a key: letters and numbers get their own, everything else is a heart
+art_for_key() {
+    case "$1" in
+        [A-Za-z]) get_letter_art "${1^^}" ;;
+        [0-9]) get_number_art "$1" ;;
+        *) echo "$2" ;;
+    esac
+}
+
+# Set ART_W and ART_H to the size of a piece of art, without a subshell
+measure_art() {
+    local line
+    ART_W=0
+    ART_H=0
+    while IFS= read -r line; do
+        if [ ${#line} -gt $ART_W ]; then
+            ART_W=${#line}
+        fi
+        ART_H=$((ART_H + 1))
+    done <<< "$1"
+}
+
+# Stickers stay on screen until the next heart burst. Each one is stored
+# pre-rendered, with spaces turned into cursor moves so the stickers
+# underneath show through.
+stickers=()
+
+add_sticker() {
+    local art="$1" color="$2" rows="$3" cols="$4"
+    local line top left r=0 sticker
+    measure_art "$art"
+    if [ $ART_H -gt $rows ] || [ $ART_W -gt $cols ]; then
+        return
+    fi
+    top=$((1 + RANDOM % (rows - ART_H + 1)))
+    left=$((1 + RANDOM % (cols - ART_W + 1)))
+    sticker=$'\e[1;'"${color}m"
+    while IFS= read -r line; do
+        line=${line//\#/♥}
+        sticker+=$'\e['"$((top + r));${left}H${line// /$'\e[C'}"
+        r=$((r + 1))
+    done <<< "$art"
+    stickers+=("$sticker")
+}
+
+# Add a handful of hearts at random spots to FRAME
+sprinkle_hearts() {
+    local count="$1" rows="$2" cols="$3" i
+    for ((i=0; i<count; i++)); do
+        FRAME+=$'\e['"$((1 + RANDOM % rows));$((1 + RANDOM % cols))H"
+        FRAME+=$'\e[1;'"${colors[RANDOM % ${#colors[@]}]}m♥"
+    done
+    FRAME+=$'\e[0m'
+}
+
+# Add art to FRAME scaled up to fill the screen, centered, in solid color blocks.
+# Background colors draw solid blocks with any console font.
+draw_giant() {
+    local art="$1" color="$2" rows="$3" cols="$4"
+    local scale scale_x cell_w top left block gap line row i k r=0
+    measure_art "$art"
+
+    # Console cells are about twice as tall as they are wide, so each art cell is 2 wide
+    scale=$(( (rows - 2) / ART_H ))
+    scale_x=$(( (cols - 4) / (ART_W * 2) ))
+    if [ $scale_x -lt $scale ]; then
+        scale=$scale_x
+    fi
+    if [ $scale -lt 1 ]; then
+        scale=1
+    fi
+    cell_w=$((scale * 2))
+    top=$(( (rows - ART_H * scale) / 2 + 1 ))
+    left=$(( (cols - ART_W * cell_w) / 2 + 1 ))
+    printf -v block '%*s' "$cell_w" ''
+    gap=$'\e['"${cell_w}C"
+
+    FRAME+=$'\e['"$((color % 10 + 40))m"
+    while IFS= read -r line; do
+        row=""
+        for ((i=0; i<${#line}; i++)); do
+            if [ "${line:i:1}" = " " ]; then
+                row+=$gap
+            else
+                row+=$block
+            fi
+        done
+        for ((k=0; k<scale; k++)); do
+            FRAME+=$'\e['"$((top + r * scale + k));${left}H${row}"
+        done
+        r=$((r + 1))
+    done <<< "$art"
+    FRAME+=$'\e[0m'
+}
+
+# Fill the screen with hearts, then start a fresh sticker book
+heart_burst() {
+    local rows="$1" cols="$2" i
+    for ((i=0; i<20; i++)); do
+        FRAME=""
+        sprinkle_hearts $((rows * cols / 40)) "$rows" "$cols"
+        printf '%s' "$FRAME"
+        sleep 0.05
+    done
+    stickers=()
+}
+
+# Holding space scrolls rows of big hearts across the whole screen, each heart its own color
+scroll_hearts() {
+    local size rows cols count pad padding line i out
+    local -a heart_colors
+    size=$(stty size)
+    rows=${size% *}
+    cols=${size#* }
+
+    # Hearts are 11 wide with a gap of 2
+    count=$(( (cols + 2) / 13 ))
+    if [ $count -lt 1 ]; then
+        count=1
+    fi
+    pad=$(( (cols - count * 13 + 2) / 2 ))
+    if [ $pad -lt 0 ]; then
+        pad=0
+    fi
+    printf -v padding '%*s' "$pad" ''
+    for ((i=0; i<count; i++)); do
+        heart_colors[i]=${colors[RANDOM % ${#colors[@]}]}
+    done
+
+    out=$'\e['"${rows};1H"
+    while IFS= read -r line; do
+        out+=$'\n'"$padding"
+        for ((i=0; i<count; i++)); do
+            if [ $i -gt 0 ]; then
+                out+="  "
+            fi
+            out+=$'\e[1;'"${heart_colors[i]}m${line//\#/♥}"
+        done
+    done <<< "$HEART_ART"
+    printf '%s\033[0m\n' "$out"
+}
+
+# One keypress: the sticker book, a few loose hearts, and the new key as a giant
+# in the middle. The giant becomes a sticker on the next keypress.
+draw_screen() {
+    local key="$1" color="$2"
+    local size rows cols sticker
+    size=$(stty size)
+    rows=${size% *}
+    cols=${size#* }
+
+    if [ ${#stickers[@]} -ge $((rows * cols / 60)) ]; then
+        heart_burst "$rows" "$cols"
+    fi
+
+    FRAME=$'\e[2J'
+    for sticker in "${stickers[@]}"; do
+        FRAME+=$sticker
+    done
+    FRAME+=$'\e[0m'
+    sprinkle_hearts 12 "$rows" "$cols"
+    draw_giant "$(art_for_key "$key" "$HEART_ART")" "$color" "$rows" "$cols"
+    FRAME+=$'\e['"${rows};1H"
+    printf '%s' "$FRAME"
+
+    add_sticker "$(art_for_key "$key" "$STICKER_HEART_ART")" "$color" "$rows" "$cols"
+}
+
 # Color list
 colors=(31 32 33 34 35 36 91 92 93 94 95 96)
 
@@ -323,8 +498,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Usage: $0 [-n|--number COUNT] [test [CHARACTER]]"
-            echo "  -n, --number COUNT: Number of characters to display on each line (default: 5)"
-            echo "  test [CHARACTER]: Test mode - display one character and exit"
+            echo "  -n, --number COUNT: Test mode only - copies of the character per line (default: 5)"
+            echo "  test [CHARACTER]: Test mode - print one character and exit"
             exit 1
             ;;
     esac
@@ -373,8 +548,11 @@ while true; do
     # Random color
     color=${colors[$RANDOM % ${#colors[@]}]}
 
-    # Print big colored letter with specified repeat count
-    print_big_letter "$key" "$color" "$repeat_count"
+    if [ "$key" = " " ]; then
+        scroll_hearts
+    else
+        draw_screen "$key" "$color"
+    fi
 
     # Drop keys mashed while drawing so the screen doesn't lag behind
     while read -t 0; do read_key _; done
