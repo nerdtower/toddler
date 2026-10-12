@@ -485,7 +485,12 @@ scroll_row() {
 #   $ cmd          typed by keypresses; the lines after it are its output
 #   $! cmd         typed, then really run (harmless, read-only commands only)
 #   @SELF n        output is the first n lines of this script
-#   @PROGRESS txt  output is a progress bar that fills up by itself
+#   @PROGRESS txt  a full-width progress bar that fills up by itself
+#   @DOWNLOAD a b  one progress bar per file, filling at different speeds
+#   @HEXDUMP n     n full-width lines of hex dump
+#   @CRACK WORD    big letters spin through random ones and lock into WORD
+#   @BANNER WORD   WORD in big green letters (one word per @BANNER)
+#   @MATRIX s      green characters rain down the whole screen for s seconds
 #   {r} {y} {g} {c} {b} {m} {0}   colors in output: red ... magenta, reset
 HACKER_CHARS_PER_KEY=3
 read -r -d '' HACKER_SESSION <<'EOF'
@@ -515,16 +520,26 @@ cc -O2 -Wall -c sparkle.c -o sparkle.o
 cc -o hearts heart.o rainbow.o sparkle.o
 $ ./hearts --rainbow
 {r}♥ ♥ ♥ {y}♥ ♥ ♥ {g}♥ ♥ ♥ {c}♥ ♥ ♥ {b}♥ ♥ ♥ {m}♥ ♥ ♥{0}
+$ curl -O mainframe.local/files/{hearts.db,rainbows.tar.gz,kittens.zip,stars.iso}
+@DOWNLOAD hearts.db rainbows.tar.gz kittens.zip stars.iso
+$ xxd secret.bin
+@HEXDUMP 28
 $! free -h
+$ ./crack --target mainframe.local
+@CRACK HEARTS
+{g}Password found!{0}
 $ ssh mainframe.local
 @PROGRESS Hacking the mainframe
-{g}ACCESS GRANTED{0}
+@BANNER ACCESS
+@BANNER GRANTED
 $! ps -e | head -20
+$ matrix
+@MATRIX 4
 $ clear
 EOF
 
-# Turn HACKER_SESSION into steps. PROMPT, SHOW, RUN, PROGRESS and CLEAR run on
-# their own; TYPE steps wait for keypresses.
+# Turn HACKER_SESSION into steps. TYPE steps wait for keypresses; every other
+# step (PROMPT, SHOW, RUN, CLEAR and the @ effects) runs on its own.
 parse_hacker_session() {
     local user host dir="~" line cmd last
     user=$(id -un)
@@ -554,9 +569,9 @@ parse_hacker_session() {
                 step_kind+=(SHOW)
                 step_text+=("$(head -n "${line#@SELF }" "$0")")
                 ;;
-            '@PROGRESS '*)
-                step_kind+=(PROGRESS)
-                step_text+=("${line#@PROGRESS }")
+            '@'*)
+                step_kind+=("${line%% *}")
+                step_text+=("${line#* }")
                 ;;
             *)
                 if [ "${step_kind[last]}" = SHOW ]; then
@@ -593,9 +608,238 @@ show_output() {
     done 3<<< "$1"
 }
 
+# Wait between animation frames. A keypress ends the wait early and is kept
+# in pending; returns 1 if the adult switched modes.
+hacker_pause() {
+    if take_key -t "$1"; then
+        pending=$KEY
+    fi
+    [ "$mode" = hacker ]
+}
+
+# Set BIG_LINES to WORD drawn with the solid glyphs, one cell per letter of
+# width cell (0 means each letter's own width), centered on the screen. Letter
+# colors come from the array named by the second argument, cycling if short.
+# Returns 1 if the word doesn't fit.
+big_word() {
+    local word="$1" cell="$3"
+    local -n big_colors="$2"
+    local i r ch glyph line width total=0 pad lines=()
+    local -a rows
+    for ((i=0; i<${#word}; i++)); do
+        ch=${word:i:1}
+        glyph=${GLYPHS[$ch]}
+        line=${glyph%%$'\n'*}
+        width=${#line}
+        if [ "$cell" -gt 0 ]; then
+            width=$cell
+        fi
+        total=$((total + width + (i > 0 ? 2 : 0)))
+    done
+    if [ $total -gt "$cols" ]; then
+        return 1
+    fi
+    printf -v pad '%*s' $(( (cols - total) / 2 )) ''
+    for ((r=0; r<9; r++)); do
+        rows[r]="$pad"
+    done
+    for ((i=0; i<${#word}; i++)); do
+        ch=${word:i:1}
+        glyph=${GLYPHS[$ch]}
+        mapfile -t lines <<< "$glyph"
+        line=${lines[0]}
+        width=${#line}
+        for ((r=0; r<9; r++)); do
+            line=${lines[r]}
+            if [ "$cell" -gt 0 ]; then
+                printf -v line '%*s%s%*s' $(( (cell - width) / 2 )) '' "$line" \
+                    $(( cell - width - (cell - width) / 2 )) ''
+            fi
+            line=${line//\#/█}
+            line=${line//\'/▀}
+            line=${line//,/▄}
+            if [ $i -gt 0 ]; then
+                rows[r]+="  "
+            fi
+            rows[r]+=$'\e[1;'"${big_colors[i % ${#big_colors[@]}]}m${line}"$'\e[0m'
+        done
+    done
+    BIG_LINES=("${rows[@]}")
+}
+
+# A full-width progress bar that fills up by itself
+effect_progress() {
+    local text="$1" width i done_chars
+    width=$((cols - ${#text} - 10))
+    if [ $width -lt 10 ]; then
+        width=10
+    fi
+    for ((i=0; i<=100; i+=2)); do
+        done_chars=$((width * i / 100))
+        printf '\r%s [\033[1;32m%s\033[0m%*s] %3d%%' "$text" \
+            "$(printf '%*s' "$done_chars" '' | tr ' ' '#')" $((width - done_chars)) '' "$i"
+        hacker_pause 0.03 || return
+    done
+    printf '\n'
+}
+
+# One progress bar per file, each filling at its own speed
+effect_download() {
+    local -a names pct=()
+    local i n width done_chars all_done bar speed
+    read -ra names <<< "$1"
+    n=${#names[@]}
+    width=$((cols - 44))
+    if [ $width -lt 10 ]; then
+        width=10
+    fi
+    for ((i=0; i<n; i++)); do
+        pct[i]=0
+        printf '\n'
+    done
+    while true; do
+        printf '\033[%dA' "$n"
+        all_done=1
+        for ((i=0; i<n; i++)); do
+            if [ "${pct[i]}" -lt 100 ]; then
+                pct[i]=$(( pct[i] + 1 + RANDOM % 6 ))
+                if [ "${pct[i]}" -gt 100 ]; then
+                    pct[i]=100
+                fi
+                all_done=0
+            fi
+            done_chars=$((width * pct[i] / 100))
+            printf -v bar '%*s' "$done_chars" ''
+            bar=${bar// /=}
+            if [ "${pct[i]}" -lt 100 ]; then
+                bar+=">"
+                speed="$((1 + RANDOM % 9)).$((RANDOM % 10)) MB/s"
+            else
+                bar+="="
+                speed="done"
+            fi
+            printf '\r%-18s [\033[1;36m%-*s\033[0m] %3d%%  %-9s\033[K\n' \
+                "${names[i]}" $((width + 1)) "$bar" "${pct[i]}" "$speed"
+        done
+        if [ $all_done -eq 1 ]; then
+            return
+        fi
+        hacker_pause 0.05 || return
+    done
+}
+
+# Full-width hex dump of random bytes
+effect_hexdump() {
+    local count="$1" per_line i j byte hex ascii out=""
+    per_line=$(( (cols - 12) / 4 / 8 * 8 ))
+    if [ $per_line -lt 8 ]; then
+        per_line=8
+    fi
+    for ((i=0; i<count; i++)); do
+        hex=""
+        ascii=""
+        for ((j=0; j<per_line; j++)); do
+            byte=$((RANDOM % 256))
+            printf -v hex '%s%02x ' "$hex" "$byte"
+            if [ $byte -ge 33 ] && [ $byte -le 126 ]; then
+                printf -v ascii "%s\\x$(printf '%x' "$byte")" "$ascii"
+            else
+                ascii+="."
+            fi
+        done
+        printf -v out '%s{c}%08x{0}: %s {y}%s{0}\n' "$out" $((i * per_line)) "$hex" "$ascii"
+    done
+    show_output "${out%$'\n'}"
+}
+
+# Big letters spin through random ones and lock into the word one at a time
+effect_crack() {
+    local word="$1" letters="ABCDEFGHIJKLMNOPQRSTUVXYZ0123456789"
+    local locked=0 frame=0 i shown r
+    local -a colors_now
+    printf '\033[?25l'
+    for ((r=0; r<9; r++)); do
+        printf '\n'
+    done
+    while [ $locked -le ${#word} ]; do
+        shown=""
+        colors_now=()
+        for ((i=0; i<${#word}; i++)); do
+            if [ $i -lt $locked ]; then
+                shown+=${word:i:1}
+                colors_now[i]=32
+            else
+                shown+=${letters:RANDOM % ${#letters}:1}
+                colors_now[i]=37
+            fi
+        done
+        if ! big_word "$shown" colors_now 18; then
+            break
+        fi
+        printf '\033[9A'
+        for ((r=0; r<9; r++)); do
+            printf '\r%s\033[K\n' "${BIG_LINES[r]}"
+        done
+        frame=$((frame + 1))
+        if [ $((frame % 6)) -eq 0 ]; then
+            locked=$((locked + 1))
+        fi
+        hacker_pause 0.05 || break
+    done
+    printf '\033[?25h'
+}
+
+# A word in big green letters, scrolled in like output
+effect_banner() {
+    local -a green=(32)
+    if big_word "$1" green 0; then
+        printf '\n'
+        show_output "$(printf '%s\n' "${BIG_LINES[@]}")"
+    else
+        show_output "{g}$1{0}"
+    fi
+}
+
+# Green characters rain down the whole screen
+effect_matrix() {
+    local seconds="$1" chars="0123456789ABCDEFabcdef#$%&*+=<>"
+    local rows frames f c out size
+    local -a drop tail
+    size=$(stty size 2>/dev/null)
+    rows=${size% *}
+    rows=${rows:-24}
+    for ((c=1; c<=cols; c++)); do
+        drop[c]=$(( -(RANDOM % rows) ))
+        tail[c]=$((6 + RANDOM % 14))
+    done
+    frames=$(( seconds * 25 ))
+    printf '\033[?25l\033[2J'
+    for ((f=0; f<frames; f++)); do
+        out=""
+        for ((c=1; c<=cols; c+=2)); do
+            drop[c]=$((drop[c] + 1))
+            if [ "${drop[c]}" -ge 1 ] && [ "${drop[c]}" -le "$rows" ]; then
+                out+=$'\e['"${drop[c]};${c}H"$'\e[1;37m'"${chars:RANDOM % ${#chars}:1}"
+            fi
+            if [ $((drop[c] - 1)) -ge 1 ] && [ $((drop[c] - 1)) -le "$rows" ]; then
+                out+=$'\e['"$((drop[c] - 1));${c}H"$'\e[1;32m'"${chars:RANDOM % ${#chars}:1}"
+            fi
+            if [ $((drop[c] - tail[c])) -ge 1 ] && [ $((drop[c] - tail[c])) -le "$rows" ]; then
+                out+=$'\e['"$((drop[c] - tail[c]));${c}H "
+            fi
+            if [ $((drop[c] - tail[c])) -gt "$rows" ]; then
+                drop[c]=$(( -(RANDOM % 10) ))
+                tail[c]=$((6 + RANDOM % 14))
+            fi
+        done
+        printf '%s\033[0m' "$out"
+        hacker_pause 0.04 || break
+    done
+    printf '\033[0m\033[2J\033[H\033[?25h'
+}
+
 # Run steps until the next one that needs typing
 run_hacker_steps() {
-    local i
     while [ "$mode" = hacker ]; do
         case "${step_kind[step]}" in
             TYPE) return ;;
@@ -603,16 +847,12 @@ run_hacker_steps() {
             SHOW) show_output "${step_text[step]}" ;;
             RUN) show_output "$(bash -c "${step_text[step]}" 2>&1 | head -n 30)" ;;
             CLEAR) printf '\033[2J\033[H' ;;
-            PROGRESS)
-                printf '%s [' "${step_text[step]}"
-                for ((i=0; i<30; i++)); do
-                    printf '\033[1;32m#\033[0m'
-                    if take_key -t 0.04; then
-                        pending=$KEY
-                    fi
-                done
-                printf '] 100%%\n'
-                ;;
+            @PROGRESS) effect_progress "${step_text[step]}" ;;
+            @DOWNLOAD) effect_download "${step_text[step]}" ;;
+            @HEXDUMP) effect_hexdump "${step_text[step]}" ;;
+            @CRACK) effect_crack "${step_text[step]}" ;;
+            @BANNER) effect_banner "${step_text[step]}" ;;
+            @MATRIX) effect_matrix "${step_text[step]}" ;;
         esac
         step=$(( (step + 1) % ${#step_kind[@]} ))
     done
