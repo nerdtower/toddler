@@ -72,10 +72,14 @@ for font in ter-v32b Lat15-TerminusBold32x16 Uni2-TerminusBold32x16; do
     setfont "\$font" 2>/dev/null && break
 done
 
+# Bash counts bytes instead of characters without a UTF-8 locale, which cuts
+# the big letters short
+export LC_ALL=C.UTF-8
+
 # The adult exit sequence (z, 9, !) ends toddler.sh and asks for the adult
 # password. A wrong password or a closed shell goes straight back to the game.
 while true; do
-    $BIN/toddler.sh
+    $BIN/toddler.sh --hacker
     su - $adult_user
 done
 EOF

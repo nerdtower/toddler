@@ -88,7 +88,7 @@ sudo ./kiosk-setup.sh install    # then reboot
 sudo ./kiosk-setup.sh uninstall  # then reboot
 ```
 
-- Boots to the text console (no desktop) and auto-logs in a `toddler` user whose shell is `toddler.sh`
+- Boots to the text console (no desktop) and auto-logs in a `toddler` user whose shell is `toddler.sh`, starting in hacker mode (`z`, `9`, `@` switches to hearts)
 - Removes console switching (Ctrl+Alt+F1-F12, Alt+arrows), Ctrl+Alt+Del, Scroll Lock, and SysRq
 - Ignores the power, suspend, hibernate and reboot keys (holding the power button still forces off)
 - Uses a bigger console font if Terminus is installed (`console-setup` on Debian/Ubuntu, `terminus-font` on Fedora/Arch)

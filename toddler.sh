@@ -717,7 +717,7 @@ pane_draw_all() {
     for ((i=0; i<PANE_H; i++)); do
         printf -v out '%s\033[%d;1H%s\033[0m%*s' "$out" $((i + 1)) "${P_FIT[i]}" $((LW - ${P_VIS[i]:-0})) ''
         if [ $RW -gt 0 ]; then
-            out+=$'\e[32m\e(0x\e(B\e[0m'
+            out+=$'\e[32m│\e[0m'
         fi
     done
     printf '%s' "$out"
