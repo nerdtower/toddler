@@ -500,6 +500,8 @@ scroll_row() {
 #   @BANNER WORD   WORD in big green letters (one word per @BANNER)
 #   @TRAIN         a choo-choo train drives across
 #   @NYAN          a kitty flies across with a rainbow behind it
+#   @SLIDE name d c   ASCII art slides across in color c: d 1 moves right, -1 left
+#   @FIREWORKS s   fireworks burst for s seconds
 #   @ROCKET        a 3, 2, 1 countdown and a rocket that blasts off the top
 #   @MATRIX s      green characters rain down for s seconds
 #   @ZOOM/@UNZOOM  the left pane fills the screen, like tmux zoom, and back
@@ -594,6 +596,59 @@ $ matrix
 @MATRIX 4
 @UNZOOM
 ---
+$! date
+$! uptime
+---
+$ traceroute rainbow.local
+traceroute to rainbow.local (10.7.7.7), 30 hops max
+ 1  home.local (192.168.1.1)  0.8 ms
+ 2  {c}cloud.puffy{0} (10.1.1.1)  4.2 ms
+ 3  {c}cloud.fluffy{0} (10.2.2.2)  6.9 ms
+ 4  {y}sunshine.sky{0} (10.5.5.5)  9.1 ms
+ 5  {r}r{y}a{g}i{c}n{b}b{m}o{r}w{0}.local (10.7.7.7)  12.3 ms
+---
+$ curl wttr.in/home
+Weather report: home
+
+    {y}\   /{0}      Sunny
+     {y}.-.{0}       72 F
+  {y}-- (   ) --{0}   Chance of hearts: 100%
+     {y}`-'{0}
+    {y}/   \{0}
+---
+$ make me a sandwich
+make: *** No rule to make target 'me'.  Stop.
+$ sudo make me a sandwich
+{g}Okay.{0}
+@ART SANDWICH 33
+---
+$ pip install bubbles giggles
+Collecting bubbles
+Collecting giggles
+@PROGRESS Installing
+Successfully installed {g}bubbles-9.9 giggles-2.0{0}
+---
+$ ./abc
+@CRACK ABC
+$ ./count
+@CRACK 123
+---
+$ ls zoo/
+{c}bunny.txt{0}  {c}cow.txt{0}
+$ cat zoo/cow.txt
+@ART COW 37
+$ cat zoo/bunny.txt
+@ART BUNNY 35
+---
+$ ./dino --stomp
+@SLIDE DINO 1 32
+{g}ROAR!{0}
+---
+@ZOOM
+$ ./fireworks
+@FIREWORKS 5
+@UNZOOM
+---
 $ clear
 EOF
 
@@ -620,6 +675,39 @@ IFS= read -r -d '' ART_DUCK <<'EOF'
 ___( o)>
 \ <_. )
  `---'
+EOF
+
+IFS= read -r -d '' ART_COW <<'EOF'
+        (__)
+        (oo)
+  /------\/
+ / |    ||
+*  /\---/\
+   ~~   ~~
+EOF
+
+IFS= read -r -d '' ART_BUNNY <<'EOF'
+(\(\
+( -.-)
+o_(")(")
+EOF
+
+IFS= read -r -d '' ART_SANDWICH <<'EOF'
+  _________________
+ /                 \
+|~~~~~~~~~~~~~~~~~~~|
+|###################|
+|^^^^^^^^^^^^^^^^^^^|
+ \_________________/
+EOF
+
+IFS= read -r -d '' ART_DINO <<'EOF'
+               __
+              / _)
+     _.----._/ /
+    /         /
+ __/ (  | (  |
+/__.-'|_|--|_|
 EOF
 
 IFS= read -r -d '' ART_TRAIN <<'EOF'
@@ -1320,6 +1408,69 @@ effect_nyan() {
     slide_art "$ART_NYAN" 1 trail 37
 }
 
+# Bursts of colored stars that grow out from a point and fade, drawn straight
+# onto the left pane like the matrix rain
+effect_fireworks() {
+    local frames f i k r x y out ch
+    local -a bx by bage bcolor colors=(31 33 32 36 35 37)
+    local -a dirs=(0 -1 1 -1 1 0 1 1 0 1 -1 1 -1 0 -1 -1)
+    if [ "$LW" -lt 20 ] || [ "$PANE_H" -lt 10 ]; then
+        return
+    fi
+    for ((i=0; i<4; i++)); do
+        bage[i]=-1
+    done
+    frames=$(( $1 * 12 ))
+    pane_clear
+    printf '\033[?25l'
+    for ((f=0; f<frames; f++)); do
+        out=""
+        for ((i=0; i<4; i++)); do
+            if [ "${bage[i]}" -lt 0 ]; then
+                if [ $((RANDOM % 4)) -eq 0 ]; then
+                    bx[i]=$((9 + RANDOM % (LW - 18)))
+                    by[i]=$((4 + RANDOM % (PANE_H - 8)))
+                    bcolor[i]=${colors[RANDOM % ${#colors[@]}]}
+                    bage[i]=0
+                fi
+                continue
+            fi
+            for r in $((bage[i] - 1)) "${bage[i]}"; do
+                if [ "$r" -lt 0 ] || [ "$r" -gt 4 ]; then
+                    continue
+                fi
+                if [ "$r" -lt "${bage[i]}" ]; then
+                    ch=" "
+                elif [ "$r" -eq 0 ]; then
+                    ch="@"
+                elif [ "$r" -lt 4 ]; then
+                    ch="*"
+                else
+                    ch="."
+                fi
+                for ((k=0; k<16; k+=2)); do
+                    x=$((bx[i] + dirs[k] * r * 2))
+                    y=$((by[i] + dirs[k + 1] * r))
+                    if [ $x -ge 1 ] && [ $x -le "$LW" ] && [ $y -ge 1 ] && [ $y -le "$PANE_H" ]; then
+                        out+=$'\e['"$y;${x}H"$'\e[1;'"${bcolor[i]}m$ch"
+                    fi
+                    if [ "$r" -eq 0 ]; then
+                        break
+                    fi
+                done
+            done
+            bage[i]=$((bage[i] + 1))
+            if [ "${bage[i]}" -gt 5 ]; then
+                bage[i]=-1
+            fi
+        done
+        printf '%s\033[0m' "$out"
+        hacker_pause 0.08 || return
+    done
+    printf '\033[?25h'
+    pane_clear
+}
+
 # Countdown in big numbers, then a rocket that blasts off the top of the pane
 effect_rocket() {
     local -a white=(37) flames=("  (  )  " " ( )( ) " "  )  (  " " (  )(  " "   ()   " "    .   ")
@@ -1383,7 +1534,7 @@ effect_matrix() {
             fi
         done
         printf '%s\033[0m' "$out"
-        hacker_pause 0.04 || break
+        hacker_pause 0.04 || return
     done
     printf '\033[?25h'
     pane_clear
@@ -1392,7 +1543,7 @@ effect_matrix() {
 # Run steps until the next one that needs typing. At the end of the session,
 # shuffle a new one and keep going.
 run_hacker_steps() {
-    local art_name
+    local art_name dir color
     while [ "$mode" = hacker ]; do
         case "${step_kind[step]}" in
             TYPE) return ;;
@@ -1413,6 +1564,12 @@ run_hacker_steps() {
             @BANNER) effect_banner "${step_text[step]}" ;;
             @TRAIN) effect_train ;;
             @NYAN) effect_nyan ;;
+            @SLIDE)
+                read -r art_name dir color <<< "${step_text[step]}"
+                art_name="ART_$art_name"
+                slide_art "${!art_name}" "$dir" "" "$color"
+                ;;
+            @FIREWORKS) effect_fireworks "${step_text[step]}" ;;
             @ROCKET) effect_rocket ;;
             @MATRIX) effect_matrix "${step_text[step]}" ;;
             @ZOOM) zoomed=1; pane_relayout ;;

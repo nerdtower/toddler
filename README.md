@@ -30,9 +30,9 @@ chmod +x toddler.sh
 `./toddler.sh --hacker` starts in hacker mode: every key types the next few characters of a pretend terminal session, so button mashing looks like a grown-up typing. Enter finishes the current command.
 
 - **Pretend tmux**: the session runs in a left pane, a pretend `htop` with CPU bars (they jump when keys are pressed) runs on the right, and a green status bar sits at the bottom. It's all drawn by the script; no real tmux runs. Big effects zoom the left pane to full screen like tmux zoom
-- **Chapters**: git, ping, downloads with progress bars, a hex dump, a password crack in big letters, `ssh mainframe` ending in a giant ACCESS GRANTED, Matrix rain, a kitty and `kittysay`, a puppy and a duck, an aquarium, a choo-choo train, a flying rainbow kitty, and a rocket launch with a 3-2-1 countdown
+- **Chapters**: git, ping, downloads with progress bars, a hex dump, a password crack in big letters, `ssh mainframe` ending in a giant ACCESS GRANTED, Matrix rain, a kitty and `kittysay`, a puppy and a duck, an aquarium, a choo-choo train, a flying rainbow kitty, a rocket launch with a 3-2-1 countdown, a stomping dinosaur, fireworks, a cow and a bunny, big ABC and 123, a sunny weather report, traceroute to rainbow.local, `sudo make me a sandwich`, and a pip install of bubbles
 - **Never the same twice**: chapters are shuffled on every loop
-- A few commands (`uname -a`, `df -h`, `free -h`, `ps -e`) really run, so their output is real
+- A few commands (`uname -a`, `df -h`, `free -h`, `ps -e`, `date`, `uptime`) really run, so their output is real
 
 The session lives in `HACKER_SESSION` in `toddler.sh`, one line per command, and is easy to edit.
 
