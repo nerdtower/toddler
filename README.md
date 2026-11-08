@@ -96,6 +96,22 @@ sudo ./kiosk-setup.sh uninstall  # then reboot
 
 Requires systemd and the kbd tools (`dumpkeys`, `loadkeys`).
 
+### As a boot menu option
+
+To keep the laptop's desktop and add toddler mode as a choice at boot (Debian, Ubuntu, Mint):
+
+```bash
+sudo ./kiosk-setup.sh install-boot-option   # then reboot
+```
+
+- Adds a "Toddler" entry to the GRUB menu and shows the menu for 5 seconds at boot. The first entry is still the normal desktop
+- The Toddler entry boots to the text console with everything above. A normal boot has none of it: no autologin, no key changes
+- The toddler account is locked and owns none of the installed files, so it can't change the game or the setup
+- Holding the power button still forces the laptop off. The next boot shows the menu and defaults to the desktop, so pick Toddler again
+- Not supported on a ZFS root; use `install` there
+- To update: `git pull` as yourself, then run `sudo ./kiosk-setup.sh install-boot-option` again
+- `sudo ./kiosk-setup.sh uninstall` removes it, menu entry included
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
