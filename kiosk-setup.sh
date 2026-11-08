@@ -11,7 +11,8 @@
 # install-boot-option does the same, but only when "Toddler" is picked in the
 # GRUB menu; a normal boot is the untouched desktop.
 #
-# Usage: sudo ./kiosk-setup.sh install|install-boot-option|uninstall
+# Usage: sudo ./kiosk-setup.sh [install|install-boot-option|uninstall]
+# With no argument it asks which one.
 #
 # Needs systemd and the kbd tools (dumpkeys, loadkeys). install-boot-option
 # also needs GRUB with update-grub (Debian, Ubuntu, Mint).
@@ -299,9 +300,45 @@ uninstall_kiosk() {
 
 [ "$(id -u)" -eq 0 ] || die "run with sudo"
 
-case "${1:-}" in
+choose_action() {
+    local boot_label="Add Toddler to the boot menu (the desktop stays the default)"
+    local kiosk_label="Always boot into Toddler (no desktop)"
+    local boot_action=install-boot-option kiosk_action=install
+    if [ -e "$CONSOLE_UNIT" ]; then
+        echo "Installed now: the Toddler boot menu option" >&2
+        boot_label="Update the Toddler boot menu option"
+        kiosk_label="Switch to always booting into Toddler (no desktop)"
+        kiosk_action=switch-to-kiosk
+    elif [ -e "$GETTY_DROPIN" ]; then
+        echo "Installed now: always boot into Toddler" >&2
+        kiosk_label="Update the always-on Toddler kiosk"
+        boot_label="Switch to a Toddler boot menu option (the desktop comes back)"
+        boot_action=switch-to-boot-option
+    fi
+    echo "1) $boot_label" >&2
+    echo "2) $kiosk_label" >&2
+    echo "3) Uninstall" >&2
+    echo "4) Quit" >&2
+    local choice
+    read -rp "Choose 1-4: " choice
+    case "$choice" in
+        1) echo "$boot_action" ;;
+        2) echo "$kiosk_action" ;;
+        3) echo uninstall ;;
+        4) echo quit ;;
+        *) echo "Nothing chosen" >&2; echo quit ;;
+    esac
+}
+
+action=${1:-}
+[ -n "$action" ] || action=$(choose_action)
+
+case "$action" in
     install) install_kiosk ;;
     install-boot-option) install_boot_option ;;
     uninstall) uninstall_kiosk ;;
-    *) echo "Usage: sudo $0 install|install-boot-option|uninstall" >&2; exit 1 ;;
+    switch-to-kiosk) uninstall_kiosk; install_kiosk ;;
+    switch-to-boot-option) uninstall_kiosk; install_boot_option ;;
+    quit) ;;
+    *) echo "Usage: sudo $0 [install|install-boot-option|uninstall]" >&2; exit 1 ;;
 esac

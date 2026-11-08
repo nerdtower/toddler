@@ -81,7 +81,7 @@ Switch between hearts and hacker mode at any time with `z`, `9`, `@` (shift+2) w
 
 ## Kiosk mode (Linux)
 
-Inside a desktop, the window manager still handles shortcuts like Alt+Tab or the Super key before `toddler.sh` sees them. `kiosk-setup.sh` turns a spare Linux laptop into a toddler-only machine:
+Inside a desktop, the window manager still handles shortcuts like Alt+Tab or the Super key before `toddler.sh` sees them. `kiosk-setup.sh` turns a spare Linux laptop into a toddler-only machine. Run `sudo ./kiosk-setup.sh` and pick from the menu, or name the step:
 
 ```bash
 sudo ./kiosk-setup.sh install    # then reboot
